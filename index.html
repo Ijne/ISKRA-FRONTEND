@@ -3,47 +3,33 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ИСКРА PREMIUM</title>
+    <title>ISKRA</title>
 </head>
 <body>
-    <canvas id="fireCanvas"></canvas>
+    <main id="mainContent">
+        <!-- Сюда будет подгружаться либо анкета, либо основной контент -->
+    </main>
 
-    <div class="auth-container" id="authContainer">
-        <div class="spark-container" id="sparkContainer">
-            <div class="pulse-ring"></div>
-            <div class="spark-elegant">
-                <div class="spark-dot"></div>
-                <div class="spark-orbit">
-                    <div class="orbit-particle"></div>
-                </div>
-                <div class="spark-orbit">
-                    <div class="orbit-particle"></div>
-                </div>
-                <div class="spark-orbit">
-                    <div class="orbit-particle"></div>
-                </div>
-                <div class="spark-orbit">
-                    <div class="orbit-particle"></div>
-                </div>
-            </div>
-            <div class="click-hint">Коснись меня</div>
-        </div>
-        
-        <h1 class="auth-title">ИСКРА</h1>
-        <p class="auth-subtitle">Прикоснись к энергии новых встреч</p>
-        
-        <div class="loading-container" id="loadingContainer">
-            <div class="loading-text">Зажигание</div>
-            <div class="loading-bar">
-                <div class="loading-progress" id="loadingProgress"></div>
-            </div>
+    <div class="bottom-nav" id="bottomNav">
+        <div class="nav-container">
+            <button class="nav-button active">
+                <div class="nav-icon">👤</div>
+                <div class="nav-label">Профиль</div>
+            </button>
+            
+            <button class="main-button">
+                <div class="main-icon">🔥</div>
+            </button>
+            
+            <button class="nav-button">
+                <div class="nav-icon">🎯</div>
+                <div class="nav-label">Мероприятия</div>
+            </button>
         </div>
     </div>
-
-    <div class="main-container container" id="mainContainer">
-        <!-- Основной интерфейс -->
-    </div>
-<link rel="stylesheet" href="./css/start.css">
-<script src="./js/start.js"></script>
 </body>
+<link rel="stylesheet" href="./css/base.css">
+<link rel="stylesheet" href="./css/index.css">
+<script src="./js/base.js"></script>
+<script src="./js/index.js"></script>
 </html>
