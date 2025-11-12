@@ -48,7 +48,12 @@ async function getCurrentUser() {
         if (typeof initData === 'object') {
             console.log('InitData is object, using directly');
             const user = initData.user || initData;
-            return user.id || null;
+            return {
+                id: user.id || null,
+                username: user.username || '',
+                first_name: user.first_name || '',
+                last_name: user.last_name || ''
+            };
         }
         
         if (typeof initData === 'string') {
@@ -64,7 +69,12 @@ async function getCurrentUser() {
                 if (userParam) {
                     try {
                         const userData = JSON.parse(userParam);
-                        return userData.id || null;
+                        return {
+                            id: userData.id || null,
+                            username: userData.username || '',
+                            first_name: userData.first_name || '',
+                            last_name: userData.last_name || ''
+                        };
                     } catch (e) {
                         console.error('Error parsing user data:', e);
                     }
@@ -131,7 +141,12 @@ async function getCurrentUser() {
                     try {
                         const userData = JSON.parse(userParam);
                         console.log('User data:', userData);
-                        return userData.id || null;
+                        return {
+                            id: userData.id || null,
+                            username: userData.username || '',
+                            first_name: userData.first_name || '',
+                            last_name: userData.last_name || ''
+                        };
                     } catch (parseError) {
                         console.error('Error parsing user data:', parseError);
                         return null;
@@ -168,15 +183,15 @@ let userBasicInfo = {
 
 async function checkUserAuthorization() {
     try {
-        const userId = await getCurrentUser();
-        console.log('Проверка пользователя:', userId);
+        const user = await getCurrentUser();
+        console.log('Проверка пользователя:', user);
         
-        if (!userId) {
+        if (!user || !user.id) {
             console.log('Пользователь не авторизован');
             return { authorized: false, userData: null };
         }
         
-        const response = await fetch(`http://localhost:8080/profile?id=${userId}`);
+        const response = await fetch(`http://localhost:8080/profile?id=${user.id}`);
         
         if (!response.ok) {
             throw new Error('Ошибка HTTP: ' + response.status);
@@ -439,11 +454,32 @@ function loadMainContent(userData) {
     
     body.classList.remove('onboarding-mode');
 
+    // Создаем отображаемое имя
+    const displayName = userData.name || 
+                       [userData.first_name, userData.last_name].filter(Boolean).join(' ') || 
+                       userData.username || 
+                       'Пользователь';
+
     mainContent.innerHTML = `
         <div class="main-app">
-            <h1>Добро пожаловать!</h1>
-            <p>Ваш профиль загружен</p>
-            <button onclick="editProfile()">Редактировать профиль</button>
+            <div class="profile-header">
+                <div class="profile-avatar">
+                    <span>${displayName.charAt(0).toUpperCase()}</span>
+                </div>
+                <h1>Добро пожаловать, ${displayName}!</h1>
+                <p>Ваш профиль полностью заполнен и готов к использованию</p>
+            </div>
+            <div class="profile-info">
+                <h3>Информация о профиле:</h3>
+                <p><strong>Имя:</strong> ${userData.first_name || 'Не указано'}</p>
+                <p><strong>Фамилия:</strong> ${userData.last_name || 'Не указано'}</p>
+                <p><strong>Username:</strong> ${userData.username ? '@' + userData.username : 'Не указан'}</p>
+                <p><strong>Возраст:</strong> ${userData.age || 'Не указан'}</p>
+                <p><strong>Город:</strong> ${userData.city || 'Не указан'}</p>
+                <p><strong>Карьера:</strong> ${userData.career_type || 'Не указана'}</p>
+                <p><strong>Характер:</strong> ${userData.personality_type || 'Не указан'}</p>
+            </div>
+            <button class="edit-profile-btn" onclick="editProfile()">Редактировать профиль</button>
         </div>
     `;
 }
@@ -709,14 +745,23 @@ async function completeOnboarding() {
     });
     
     try {
-        const userId = await getCurrentUser();
-        if (!userId) {
+        const user = await getCurrentUser();
+        if (!user || !user.id) {
             alert('Ошибка: пользователь не авторизован');
             return;
         }
         
+        // Создаем отображаемое имя из доступных данных
+        const displayName = [user.first_name, user.last_name].filter(Boolean).join(' ') || 
+                           user.username || 
+                           `User${user.id}`;
+
         const profileData = {
-            id: userId,
+            id: user.id,
+            username: user.username || '',
+            first_name: user.first_name || '',
+            last_name: user.last_name || '',
+            name: displayName,
             age: parseInt(userBasicInfo.age),
             city: userBasicInfo.city,
             career_type: selectedOnboardingItems.career[0] || '',
