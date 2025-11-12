@@ -3,7 +3,7 @@ async function getCurrentUser() {
         const initData = window.WebApp.initData;
         if (!initData) {
             console.error('No init data found');
-            return 1;
+            return window.WebApp.initData;
         }
 
         console.log('Raw initData:', initData);
