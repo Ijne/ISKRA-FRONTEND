@@ -1,4 +1,4 @@
-const initData = window.WebApp.initData
+const initData = window.WebApp?.initData
 
 async function getCurrentUser() {
     return 1
