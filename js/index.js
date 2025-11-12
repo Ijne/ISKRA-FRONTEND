@@ -1,7 +1,16 @@
 async function getCurrentUser() {
     try {
-        const decodedString = decodeURIComponent(initDataString);
-        
+        const initData = window.WebApp.initData || initDataString;
+        if (!initData) {
+            console.error('No init data found');
+            return 1;
+        }
+
+        console.log('Raw initData:', initData);
+
+        const decodedString = decodeURIComponent(initData);
+        console.log('Decoded initData:', decodedString);
+
         const params = new URLSearchParams(decodedString);
         const receivedHash = params.get('hash');
         
@@ -9,6 +18,8 @@ async function getCurrentUser() {
             console.error('Hash not found in init data');
             return 1;
         }
+
+        const userParam = params.get('user');
         
         params.delete('hash');
         
@@ -19,34 +30,65 @@ async function getCurrentUser() {
         dataPairs.sort();
         
         const dataCheckString = dataPairs.join('\n');
-        
+        console.log('Data check string:', dataCheckString);
+        console.log('Received hash:', receivedHash);
+
         const encoder = new TextEncoder();
-        const secretKeyMaterial = encoder.encode('WebAppData' + botToken);
         
-        const key = await crypto.subtle.importKey(
+        const webAppKey = await crypto.subtle.importKey(
             'raw',
-            secretKeyMaterial,
+            encoder.encode('WebAppData'),
             { name: 'HMAC', hash: 'SHA-256' },
             false,
             ['sign']
         );
         
-        const dataBuffer = encoder.encode(dataCheckString);
-        const signature = await crypto.subtle.sign('HMAC', key, dataBuffer);
+        const secretKey = await crypto.subtle.sign(
+            'HMAC',
+            webAppKey,
+            encoder.encode(botToken)
+        );
+        
+        console.log('Secret key (hex):', Array.from(new Uint8Array(secretKey))
+            .map(b => b.toString(16).padStart(2, '0'))
+            .join(''));
+
+        const hmacKey = await crypto.subtle.importKey(
+            'raw',
+            secretKey,
+            { name: 'HMAC', hash: 'SHA-256' },
+            false,
+            ['sign']
+        );
+        
+        const signature = await crypto.subtle.sign(
+            'HMAC',
+            hmacKey,
+            encoder.encode(dataCheckString)
+        );
         
         const calculatedHash = Array.from(new Uint8Array(signature))
             .map(b => b.toString(16).padStart(2, '0'))
             .join('');
         
+        console.log('Calculated hash:', calculatedHash);
+
         if (calculatedHash === receivedHash) {
-            const userParam = params.get('user');
+            console.log('Hash validation successful');
+            
             if (userParam) {
                 const userData = JSON.parse(userParam);
+                console.log('User data:', userData);
                 return userData.id || null;
             }
+        } else {
+            console.log('Hash validation failed');
+            console.log('Expected:', receivedHash);
+            console.log('Got:', calculatedHash);
+            return null;
         }
         
-        return null;
+        return 1;
     } catch (error) {
         console.error('Validation error:', error);
         return 1;
