@@ -2,7 +2,6 @@ function getCurrentUser() {
     return 2;
 }
 
-// Глобальные переменные
 let currentOnboardingScreen = 1;
 const selectedOnboardingItems = {
     career: [],
@@ -19,7 +18,6 @@ let userBasicInfo = {
     city: ''
 };
 
-// Проверка авторизации
 async function checkUserAuthorization() {
     const userId = getCurrentUser();
     console.log('Проверка пользователя:', userId);
@@ -60,11 +58,9 @@ function isProfileComplete(userData) {
     return isComplete;
 }
 
-// Загрузка анкеты
 function loadOnboarding() {
     console.log('Загрузка анкеты...');
     
-    // Сбрасываем данные
     Object.keys(selectedOnboardingItems).forEach(key => {
         selectedOnboardingItems[key] = [];
     });
@@ -81,7 +77,6 @@ function loadOnboarding() {
                 <div class="onboarding-progress-fill" id="onboardingProgressFill"></div>
             </div>
 
-            <!-- Экран 1: Приветствие -->
             <div class="onboarding-screen active" id="screen1">
                 <div class="onboarding-header">
                     <h1 class="onboarding-title">ISKRA</h1>
@@ -103,7 +98,6 @@ function loadOnboarding() {
                 </div>
             </div>
 
-            <!-- Экран 2: Основная информация -->
             <div class="onboarding-screen" id="screen2">
                 <div class="onboarding-header">
                     <h2 class="profile-section-title">Основная информация</h2>
@@ -137,7 +131,6 @@ function loadOnboarding() {
                 </div>
             </div>
 
-            <!-- Экран 3: Карьера -->
             <div class="onboarding-screen" id="screen3">
                 <div class="onboarding-header">
                     <h2 class="profile-section-title">Карьера</h2>
@@ -155,7 +148,6 @@ function loadOnboarding() {
                 </div>
             </div>
 
-            <!-- Экран 4: Характер -->
             <div class="onboarding-screen" id="screen4">
                 <div class="onboarding-header">
                     <h2 class="profile-section-title">Характер</h2>
@@ -173,7 +165,6 @@ function loadOnboarding() {
                 </div>
             </div>
 
-            <!-- Экран 5: Цели отношений -->
             <div class="onboarding-screen" id="screen5">
                 <div class="onboarding-header">
                     <h2 class="profile-section-title">Цели отношений</h2>
@@ -191,7 +182,6 @@ function loadOnboarding() {
                 </div>
             </div>
 
-            <!-- Экран 6: Ценности -->
             <div class="onboarding-screen" id="screen6">
                 <div class="onboarding-header">
                     <h2 class="profile-section-title">Ценности</h2>
@@ -209,7 +199,6 @@ function loadOnboarding() {
                 </div>
             </div>
 
-            <!-- Экран 7: Музыка -->
             <div class="onboarding-screen" id="screen7">
                 <div class="onboarding-header">
                     <h2 class="profile-section-title">Любимая музыка</h2>
@@ -228,7 +217,6 @@ function loadOnboarding() {
                 </div>
             </div>
 
-            <!-- Экран 8: Фильмы -->
             <div class="onboarding-screen" id="screen8">
                 <div class="onboarding-header">
                     <h2 class="profile-section-title">Любимые фильмы</h2>
@@ -247,7 +235,6 @@ function loadOnboarding() {
                 </div>
             </div>
 
-            <!-- Экран 9: Хобби -->
             <div class="onboarding-screen" id="screen9">
                 <div class="onboarding-header">
                     <h2 class="profile-section-title">Хобби и увлечения</h2>
@@ -266,7 +253,6 @@ function loadOnboarding() {
                 </div>
             </div>
 
-            <!-- Экран 10: Мероприятия -->
             <div class="onboarding-screen" id="screen10">
                 <div class="onboarding-header">
                     <h2 class="profile-section-title">Мероприятия</h2>
@@ -290,7 +276,6 @@ function loadOnboarding() {
     initOnboarding();
 }
 
-// Загрузка основного контента
 function loadMainContent(userData) {
     console.log('Загрузка основного контента:', userData);
     
@@ -304,7 +289,6 @@ function loadMainContent(userData) {
     `;
 }
 
-// Инициализация анкеты
 function initOnboarding() {
     console.log('Инициализация анкеты...');
     
@@ -346,14 +330,12 @@ function initOnboarding() {
     updateOnboardingProgress();
 }
 
-// Обновление базовой информации
 function updateBasicInfo(field, value) {
     console.log(`Обновление ${field}:`, value);
     userBasicInfo[field] = value;
     checkScreen2Complete();
 }
 
-// Проверка заполненности второго экрана
 function checkScreen2Complete() {
     const isComplete = userBasicInfo.age && userBasicInfo.city;
     const button = document.getElementById('screen2Button');
@@ -373,7 +355,6 @@ function checkScreen2Complete() {
     return isComplete;
 }
 
-// Переключение капсулы
 function toggleOnboardingCapsule(category, text, capsule) {
     console.log(`Клик по капсуле: ${category} - ${text}`);
     
@@ -413,7 +394,6 @@ function toggleOnboardingCapsule(category, text, capsule) {
     }
 }
 
-// Обновление тегов
 function updateOnboardingTags(category) {
     const tagsContainer = document.getElementById(`${category}Tags`);
     if (!tagsContainer) return;
@@ -428,7 +408,6 @@ function updateOnboardingTags(category) {
     });
 }
 
-// Удаление выбранного элемента
 function removeSelectedItem(category, item) {
     console.log(`Удаление: ${category} - ${item}`);
     
@@ -457,7 +436,6 @@ function removeSelectedItem(category, item) {
     }
 }
 
-// Обновление счетчика выбора
 function updateSelectionCounter(category) {
     const counter = document.getElementById(`${category}Counter`);
     if (!counter) return;
@@ -473,7 +451,6 @@ function updateSelectionCounter(category) {
     }
 }
 
-// Обновление состояния кнопок для одиночного выбора
 function updateCapsulesButtonState(category) {
     const screenNumber = getScreenByCategory(category);
     const button = document.getElementById(`screen${screenNumber}Button`);
@@ -493,7 +470,6 @@ function updateCapsulesButtonState(category) {
     }
 }
 
-// Обновление состояния кнопки для множественного выбора
 function updateMultipleSelectionButtonState(category) {
     const screenNumber = getScreenByCategory(category);
     const button = document.getElementById(`screen${screenNumber}Button`);
@@ -513,7 +489,6 @@ function updateMultipleSelectionButtonState(category) {
     }
 }
 
-// Вспомогательные функции
 function getCategoryByScreen(screenNumber) {
     const categories = ['career', 'personality', 'relationship', 'values', 'music', 'movies', 'hobbies', 'events'];
     return categories[screenNumber - 3] || 'career';
@@ -524,7 +499,6 @@ function getScreenByCategory(category) {
     return categories.indexOf(category) + 3;
 }
 
-// Переход между экранами
 function nextOnboardingScreen(screenNumber) {
     console.log(`Переход с экрана ${currentOnboardingScreen} на ${screenNumber}`);
     
@@ -559,7 +533,6 @@ function nextOnboardingScreen(screenNumber) {
     updateOnboardingProgress();
 }
 
-// Обновление прогресса
 function updateOnboardingProgress() {
     const progressFill = document.getElementById('onboardingProgressFill');
     if (!progressFill) return;
@@ -569,7 +542,6 @@ function updateOnboardingProgress() {
     console.log(`Прогресс: ${progress}%`);
 }
 
-// Завершение онбординга
 async function completeOnboarding() {
     console.log('Завершение онбординга...');
     console.log('Собранные данные:', {
@@ -628,7 +600,6 @@ function editProfile() {
     loadOnboarding();
 }
 
-// Основная функция
 async function initApp() {
     console.log('Инициализация приложения...');
     const authStatus = await checkUserAuthorization();
@@ -641,5 +612,4 @@ async function initApp() {
     }
 }
 
-// Запуск
 document.addEventListener('DOMContentLoaded', initApp);

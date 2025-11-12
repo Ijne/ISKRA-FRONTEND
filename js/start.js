@@ -11,7 +11,6 @@ document.addEventListener('DOMContentLoaded', function() {
     let isAnimating = false;
     let animationId;
 
-    // Получаем позицию искры относительно страницы
     function getSparkPosition() {
         const rect = sparkContainer.getBoundingClientRect();
         return {
@@ -20,7 +19,6 @@ document.addEventListener('DOMContentLoaded', function() {
         };
     }
 
-    // Пререндеренные текстуры для частиц
     function createParticleTexture(size, colorStops) {
         const canvas = document.createElement('canvas');
         canvas.width = size;
@@ -42,7 +40,6 @@ document.addEventListener('DOMContentLoaded', function() {
         return canvas;
     }
 
-    // Создаем текстуры заранее
     const textures = {
         core: createParticleTexture(64, [
             { offset: 0, color: 'rgba(255, 255, 255, 1)' },
@@ -81,7 +78,6 @@ document.addEventListener('DOMContentLoaded', function() {
             this.life -= this.decay;
             this.rotation += this.rotationSpeed;
             
-            // Плавное уменьшение
             this.size *= 0.995;
             
             return this.life > 0;
@@ -114,14 +110,12 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function createRadialExplosion(x, y) {
-        // Создаем взрыв во все стороны из позиции искры
         for (let i = 0; i < 24; i++) {
             const angle = (i / 24) * Math.PI * 2;
             const speed = Math.random() * 2 + 1.5;
             particles.push(new ElegantParticle(x, y, 'core', angle, speed));
         }
         
-        // Добавляем большие glow-частицы
         for (let i = 0; i < 12; i++) {
             const angle = (i / 12) * Math.PI * 2;
             const speed = Math.random() * 1 + 0.8;
@@ -130,11 +124,9 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function animateElegantFire() {
-        // Плавное затемнение вместо резкого очищения
         ctx.fillStyle = 'rgba(10, 10, 10, 0.08)';
         ctx.fillRect(0, 0, fireCanvas.width, fireCanvas.height);
 
-        // Обновляем и рисуем частицы
         for (let i = particles.length - 1; i >= 0; i--) {
             if (!particles[i].update()) {
                 particles.splice(i, 1);
@@ -143,7 +135,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
 
-        // Добавляем новые частицы из позиции искры
         if (isAnimating && particles.length < 60) {
             const sparkPos = getSparkPosition();
             
@@ -163,10 +154,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function redirectToHomepage() {
-        // Замените '/' на нужный URL главной страницы
         window.location.href = 'base.html';
-        // Или используйте, если нужно:
-        // window.location.replace('/');
     }
 
     sparkContainer.addEventListener('click', function() {
@@ -177,21 +165,17 @@ document.addEventListener('DOMContentLoaded', function() {
         fireCanvas.classList.add('active');
         loadingContainer.style.display = 'block';
 
-        // Получаем позицию искры для взрыва
         const sparkPos = getSparkPosition();
 
-        // Плавное исчезновение искры
         sparkContainer.style.opacity = '0';
         sparkContainer.style.transition = 'opacity 0.5s ease';
 
-        // Создаем круговой взрыв из позиции искры
         setTimeout(() => {
             createRadialExplosion(sparkPos.x, sparkPos.y);
         }, 200);
 
         animateElegantFire();
 
-        // Стильная загрузка
         let progress = 0;
         const loadingInterval = setInterval(() => {
             progress += Math.random() * 8 + 2;
@@ -205,7 +189,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     fireCanvas.classList.remove('active');
                     isAnimating = false;
                     
-                    // Перенаправление на главную страницу после небольшой задержки
                     setTimeout(redirectToHomepage, 1000);
                 }, 600);
             }
