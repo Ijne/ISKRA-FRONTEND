@@ -46,7 +46,7 @@ async function getCurrentUser() {
         const secretKey = await crypto.subtle.sign(
             'HMAC',
             webAppKey,
-            encoder.encode(botToken)
+            encoder.encode('f9LHodD0cOLRQi29OdyXpiSqLM-SyPUJnePMbZQH3ceilC7cKmf12ib4C7Oeda975ZN_gzuX6fJmQVKE5j1e')
         );
         
         console.log('Secret key (hex):', Array.from(new Uint8Array(secretKey))
@@ -85,7 +85,7 @@ async function getCurrentUser() {
             console.log('Hash validation failed');
             console.log('Expected:', receivedHash);
             console.log('Got:', calculatedHash);
-            return 1;
+            return null;
         }
         
         return 1;
