@@ -1,1107 +1,240 @@
-const initData = window.WebApp?.initData || '';
+let initData = null;
+let WebApp = null;
+
+// Ждем загрузки библиотеки Max
+function waitForWebApp() {
+    return new Promise((resolve, reject) => {
+        // Если уже загружено
+        if (window.WebApp) {
+            WebApp = window.WebApp;
+            initData = window.WebApp?.initData;
+            resolve();
+            return;
+        }
+
+        // Проверяем каждые 100мс
+        let attempts = 0;
+        const maxAttempts = 50;
+        
+        const check = () => {
+            attempts++;
+            if (window.WebApp) {
+                WebApp = window.WebApp;
+                initData = window.WebApp?.initData;
+                console.log('WebApp загружен:', WebApp);
+                console.log('InitData:', initData);
+                resolve();
+            } else if (attempts < maxAttempts) {
+                setTimeout(check, 100);
+            } else {
+                console.warn('WebApp не загрузился, продолжаем без него');
+                resolve(); // Разрешаем промис даже если WebApp не загрузился
+            }
+        };
+        
+        check();
+    });
+}
 
 async function getCurrentUser() {
     try {
+        // Ждем загрузки WebApp
+        await waitForWebApp();
+        
         if (!initData) {
             console.error('No init data found');
-            return 2517; // fallback для разработки
+            return null;
         }
 
         console.log('Raw initData:', initData);
 
-        const decodedString = decodeURIComponent(initData);
-        console.log('Decoded initData:', decodedString);
-
-        const params = new URLSearchParams(decodedString);
-        const receivedHash = params.get('hash');
+        // Пробуем разные варианты получения данных
+        let decodedString;
         
-        if (!receivedHash) {
-            console.error('Hash not found in init data');
-            return 2517; // fallback для разработки
+        // Вариант 1: если initData уже объект
+        if (typeof initData === 'object') {
+            console.log('InitData is object, using directly');
+            const user = initData.user || initData;
+            return user.id || null;
         }
-
-        const userParam = params.get('user');
         
-        const dataPairs = [];
-        for (const [key, value] of params) {
-            if (key !== 'hash') {
-                dataPairs.push(`${key}=${value}`);
-            }
-        }
-        dataPairs.sort();
-        
-        const dataCheckString = dataPairs.join('\n');
-        console.log('Data check string:', dataCheckString);
+        // Вариант 2: если это строка
+        if (typeof initData === 'string') {
+            decodedString = decodeURIComponent(initData);
+            console.log('Decoded initData:', decodedString);
 
-        const botToken = 'f9LHodD0cOLRQi29OdyXpiSqLM-SyPUJnePMbZQH3ceilC7cKmf12ib4C7Oeda975ZN_gzuX6fJmQVKE5j1e';
-        
-        const encoder = new TextEncoder();
-
-        const secretKey = await crypto.subtle.importKey(
-            'raw',
-            encoder.encode('WebAppData'),
-            { name: 'HMAC', hash: 'SHA-256' },
-            false,
-            ['sign']
-        );
-
-        const cryptoKey = await crypto.subtle.sign(
-            'HMAC',
-            secretKey,
-            encoder.encode(botToken)
-        );
-
-        const hmacKey = await crypto.subtle.importKey(
-            'raw',
-            cryptoKey,
-            { name: 'HMAC', hash: 'SHA-256' },
-            false,
-            ['sign']
-        );
-
-        const signature = await crypto.subtle.sign(
-            'HMAC',
-            hmacKey,
-            encoder.encode(dataCheckString)
-        );
-        
-        const calculatedHash = Array.from(new Uint8Array(signature))
-            .map(b => b.toString(16).padStart(2, '0'))
-            .join('');
-        
-        console.log('Calculated hash:', calculatedHash);
-        console.log('Received hash:', receivedHash);
-
-        if (calculatedHash === receivedHash) {
-            console.log('Hash validation successful');
+            const params = new URLSearchParams(decodedString);
+            const receivedHash = params.get('hash');
             
-            if (userParam) {
-                try {
-                    const userData = JSON.parse(userParam);
-                    console.log('User data:', userData);
-                    return userData.id || 2517;
-                } catch (parseError) {
-                    console.error('Error parsing user data:', parseError);
-                    return 2517;
+            if (!receivedHash) {
+                console.error('Hash not found in init data');
+                // Пробуем получить user напрямую
+                const userParam = params.get('user');
+                if (userParam) {
+                    try {
+                        const userData = JSON.parse(userParam);
+                        return userData.id || null;
+                    } catch (e) {
+                        console.error('Error parsing user data:', e);
+                    }
+                }
+                return null;
+            }
+
+            const userParam = params.get('user');
+            
+            const dataPairs = [];
+            for (const [key, value] of params) {
+                if (key !== 'hash') {
+                    dataPairs.push(`${key}=${value}`);
                 }
             }
-        } else {
-            console.log('Hash validation failed');
-            return 2517;
+            dataPairs.sort();
+            
+            const dataCheckString = dataPairs.join('\n');
+            console.log('Data check string:', dataCheckString);
+
+            const botToken = 'f9LHodD0cOLRQi29OdyXpiSqLM-SyPUJnePMbZQH3ceilC7cKmf12ib4C7Oeda975ZN_gzuX6fJmQVKE5j1e';
+            
+            const encoder = new TextEncoder();
+
+            const secretKey = await crypto.subtle.importKey(
+                'raw',
+                encoder.encode('WebAppData'),
+                { name: 'HMAC', hash: 'SHA-256' },
+                false,
+                ['sign']
+            );
+
+            const cryptoKey = await crypto.subtle.sign(
+                'HMAC',
+                secretKey,
+                encoder.encode(botToken)
+            );
+
+            const hmacKey = await crypto.subtle.importKey(
+                'raw',
+                cryptoKey,
+                { name: 'HMAC', hash: 'SHA-256' },
+                false,
+                ['sign']
+            );
+
+            const signature = await crypto.subtle.sign(
+                'HMAC',
+                hmacKey,
+                encoder.encode(dataCheckString)
+            );
+            
+            const calculatedHash = Array.from(new Uint8Array(signature))
+                .map(b => b.toString(16).padStart(2, '0'))
+                .join('');
+            
+            console.log('Calculated hash:', calculatedHash);
+            console.log('Received hash:', receivedHash);
+
+            if (calculatedHash === receivedHash) {
+                console.log('Hash validation successful');
+                
+                if (userParam) {
+                    try {
+                        const userData = JSON.parse(userParam);
+                        console.log('User data:', userData);
+                        return userData.id || null;
+                    } catch (parseError) {
+                        console.error('Error parsing user data:', parseError);
+                        return null;
+                    }
+                }
+            } else {
+                console.log('Hash validation failed');
+                return null;
+            }
         }
         
-        return 2517;
+        return null;
     } catch (error) {
         console.error('Validation error:', error);
-        return 2517;
+        return null;
     }
 }
 
-// Глобальные переменные
-let currentOnboardingScreen = 1;
-const selectedOnboardingItems = {
+const capsuleData = {
+    career: ['IT и технологии', 'Дизайн и UX', 'Медицина', 'Образование', 'Бизнес', 'Финансы', 'Маркетинг', 'Искусство', 'Музыка', 'Кино', 'Фотография', 'Архитектура', 'Инженерия', 'Недвижимость', 'Юриспруденция', 'Психология'],
+    personality: ['Экстраверт', 'Интроверт', 'Амбиверт', 'Аналитик', 'Творец', 'Прагматик', 'Романтик', 'Реалист', 'Оптимист', 'Философ', 'Новатор', 'Лидер', 'Целеустремленный', 'Гибкий', 'Настойчивый', 'Командный'],
+    relationship: ['Серьезные отношения', 'Дружба', 'Несерьезные отношения', 'Создание семьи', 'Поиск партнера', 'Романтика', 'Деловое партнерство', 'Творчество', 'Путешествия', 'Совместные проекты', 'Духовность', 'Карьера'],
+    values: ['Любовь и забота', 'Семья', 'Карьера', 'Финансы', 'Духовность', 'Здоровье', 'Образование', 'Творчество', 'Свобода', 'Приключения', 'Безопасность', 'Экология'],
+    music: ['Поп', 'Рок', 'Хип-хоп', 'Электроника', 'Джаз', 'Классика', 'R&B', 'Метал', 'Инди', 'Фолк', 'Кантри', 'Регги', 'Блюз', 'Соул', 'Диско', 'Альтернатива', 'Рэп'],
+    movies: ['Комедия', 'Драма', 'Боевик', 'Триллер', 'Ужасы', 'Фантастика', 'Фэнтези', 'Мелодрама', 'Детектив', 'Приключения', 'Аниме', 'Документальный', 'Артхаус', 'Исторический', 'Криминал', 'Мюзикл'],
+    hobbies: ['Спорт', 'Путешествия', 'Кулинария', 'Фотография', 'Рисование', 'Танцы', 'Йога', 'Велоспорт', 'Гейминг', 'Чтение', 'Садоводство', 'Рукоделие', 'Музыка', 'Театр', 'Кино', 'Настолки', 'Рыбалка', 'Охота', 'Авто', 'Технологии'],
+    events: ['Концерты', 'Кино', 'Выставки', 'Театры', 'Фестивали', 'Спортивные события', 'Вечеринки', 'Клубы', 'Рестораны', 'Кафе', 'Пикники', 'Походы', 'Мастер-классы', 'Лекции', 'Йога-сессии', 'Танцы', 'Настольные игры', 'Караоке', 'Боулинг', 'Картинг']
+};
+
+let currentField = '';
+let currentUserId = null;
+const selectedItems = {
     career: [],
     personality: [],
     relationship: [],
     values: [],
     music: [],
-    movies: [],
     hobbies: [],
+    movies: [],
     events: []
 };
-let userBasicInfo = {
-    age: '',
-    city: ''
+
+let userGender = 0;
+let preferredGender = 1;
+
+const maxSelections = {
+    career: 1,
+    personality: 1,
+    relationship: 1,
+    values: 1,
+    music: 3,
+    hobbies: 3,
+    movies: 3,
+    events: 3
 };
 
-// Данные пользователей (будут загружаться с сервера)
-let recommendedUsers = [];
-let currentUserIndex = 0;
-let startX = 0;
-let currentX = 0;
-let isDragging = false;
+const API_BASE_URL = 'http://localhost:8080';
 
-// Проверка авторизации
-async function checkUserAuthorization() {
-    const userId = await getCurrentUser();
-    console.log('Проверка пользователя:', userId);
-    
+async function fetchUserProfile() {
     try {
-        const response = await fetch(`http://localhost:8080/profile?id=${userId}`);
+        const userId = await getCurrentUser();
+        if (!userId) {
+            console.error('No user ID available');
+            return null;
+        }
+
+        const response = await fetch(`${API_BASE_URL}/profile?id=${userId}`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
         
         if (!response.ok) {
-            throw new Error('Ошибка HTTP: ' + response.status);
+            throw new Error(`HTTP error! status: ${response.status}`);
         }
         
         const userData = await response.json();
-        console.log('Данные пользователя с сервера:', userData);
-        
-        if (userData.id) {
-            return { authorized: true, userData };
-        } else {
-            return { authorized: false, userData };
-        }
+        currentUserId = userData.id;
+        return userData;
     } catch (error) {
-        console.error('Ошибка при проверке авторизации:', error);
-        return { authorized: false, userData: null };
+        console.error('Ошибка загрузки профиля:', error);
+        return null;
     }
 }
 
-// Загрузка рекомендаций с сервера
-async function loadRecommendations() {
+async function updateUserProfile(profileData) {
     try {
         const userId = await getCurrentUser();
-        console.log('Загрузка рекомендаций для пользователя:', userId);
-        
-        const response = await fetch(`http://localhost:8080/recommendations?id=${userId}`);
-        
-        if (!response.ok) {
-            throw new Error('Ошибка HTTP: ' + response.status);
-        }
-        
-        const users = await response.json();
-        console.log('Получены рекомендации:', users);
-        
-        return users;
-    } catch (error) {
-        console.error('Ошибка при загрузке рекомендаций:', error);
-        return [];
-    }
-}
-
-function isProfileComplete(userData) {
-    const requiredFields = [
-        'name', 'age', 'city', 
-        'career_type', 'personality_type', 
-        'relationship_goal', 'important_values'
-    ];
-    
-    const isComplete = requiredFields.every(field => 
-        userData[field] && userData[field].toString().trim() !== ''
-    );
-    
-    console.log('Проверка заполненности профиля:', isComplete, userData);
-    return isComplete;
-}
-
-// Загрузка анкеты
-function loadOnboarding() {
-    console.log('Загрузка анкеты...');
-    
-    // Сбрасываем данные
-    Object.keys(selectedOnboardingItems).forEach(key => {
-        selectedOnboardingItems[key] = [];
-    });
-    userBasicInfo = { age: '', city: '' };
-    
-    const mainContent = document.getElementById('mainContent');
-    const body = document.body;
-    
-    body.classList.add('onboarding-mode');
-    
-    mainContent.innerHTML = `
-        <div class="onboarding-container">
-            <div class="onboarding-progress">
-                <div class="onboarding-progress-fill" id="onboardingProgressFill"></div>
-            </div>
-
-            <!-- Экран 1: Приветствие -->
-            <div class="onboarding-screen active" id="screen1">
-                <div class="onboarding-header">
-                    <h1 class="onboarding-title">ISKRA</h1>
-                    <p class="onboarding-subtitle">Создадим твой уникальный профиль</p>
-                </div>
-                
-                <div class="onboarding-board">
-                    <div class="avatar-section">
-                        <div class="onboarding-avatar">
-                            <span>IS</span>
-                        </div>
-                    </div>
-                    
-                    <p class="onboarding-subtitle">Расскажи о себе, и мы найдем тебе идеальную пару</p>
-                    
-                    <button class="onboarding-btn active" onclick="nextOnboardingScreen(2)">
-                        Начать заполнение
-                    </button>
-                </div>
-            </div>
-
-            <!-- Экран 2: Основная информация -->
-            <div class="onboarding-screen" id="screen2">
-                <div class="onboarding-header">
-                    <h2 class="profile-section-title">Основная информация</h2>
-                    <p class="onboarding-subtitle">Расскажи немного о себе</p>
-                </div>
-                
-                <div class="onboarding-board">
-                    <div class="onboarding-fields-grid">
-                        <div class="onboarding-input-compact">
-                            <div class="onboarding-input-label">Возраст</div>
-                            <input type="number" class="onboarding-input-field" id="ageInput" 
-                                   placeholder="Укажите возраст" min="18" max="100"
-                                   oninput="updateBasicInfo('age', this.value)">
-                            <span class="onboarding-input-edit">✎</span>
-                        </div>
-                        
-                        <div class="onboarding-input-compact">
-                            <div class="onboarding-input-label">Город</div>
-                            <input type="text" class="onboarding-input-field" id="cityInput" 
-                                   placeholder="Укажите город"
-                                   oninput="updateBasicInfo('city', this.value)">
-                            <span class="onboarding-input-edit">✎</span>
-                        </div>
-                    </div>
-                    
-                    <div class="selection-required" id="screen2Message">Заполните возраст и город</div>
-                    
-                    <button class="onboarding-btn" id="screen2Button" onclick="nextOnboardingScreen(3)">
-                        Продолжить
-                    </button>
-                </div>
-            </div>
-
-            <!-- Экран 3: Карьера -->
-            <div class="onboarding-screen" id="screen3">
-                <div class="onboarding-header">
-                    <h2 class="profile-section-title">Карьера</h2>
-                    <p class="onboarding-subtitle">Чем ты занимаешься?</p>
-                </div>
-                
-                <div class="onboarding-board">
-                    <div class="onboarding-selected-tags" id="careerTags"></div>
-                    <div class="selection-required" id="screen3Message">Выберите вариант для продолжения</div>
-                    <div class="onboarding-capsules-grid" id="careerGrid"></div>
-                    
-                    <button class="onboarding-btn" id="screen3Button" onclick="nextOnboardingScreen(4)">
-                        Продолжить
-                    </button>
-                </div>
-            </div>
-
-            <!-- Экран 4: Характер -->
-            <div class="onboarding-screen" id="screen4">
-                <div class="onboarding-header">
-                    <h2 class="profile-section-title">Характер</h2>
-                    <p class="onboarding-subtitle">Какой ты человек?</p>
-                </div>
-                
-                <div class="onboarding-board">
-                    <div class="onboarding-selected-tags" id="personalityTags"></div>
-                    <div class="selection-required" id="screen4Message">Выберите вариант для продолжения</div>
-                    <div class="onboarding-capsules-grid" id="personalityGrid"></div>
-                    
-                    <button class="onboarding-btn" id="screen4Button" onclick="nextOnboardingScreen(5)">
-                        Далее
-                    </button>
-                </div>
-            </div>
-
-            <!-- Экран 5: Цели отношений -->
-            <div class="onboarding-screen" id="screen5">
-                <div class="onboarding-header">
-                    <h2 class="profile-section-title">Цели отношений</h2>
-                    <p class="onboarding-subtitle">Что ты ищешь?</p>
-                </div>
-                
-                <div class="onboarding-board">
-                    <div class="onboarding-selected-tags" id="relationshipTags"></div>
-                    <div class="selection-required" id="screen5Message">Выберите вариант для продолжения</div>
-                    <div class="onboarding-capsules-grid" id="relationshipGrid"></div>
-                    
-                    <button class="onboarding-btn" id="screen5Button" onclick="nextOnboardingScreen(6)">
-                        Далее
-                    </button>
-                </div>
-            </div>
-
-            <!-- Экран 6: Ценности -->
-            <div class="onboarding-screen" id="screen6">
-                <div class="onboarding-header">
-                    <h2 class="profile-section-title">Ценности</h2>
-                    <p class="onboarding-subtitle">Что для тебя важно?</p>
-                </div>
-                
-                <div class="onboarding-board">
-                    <div class="onboarding-selected-tags" id="valuesTags"></div>
-                    <div class="selection-required" id="screen6Message">Выберите вариант для продолжения</div>
-                    <div class="onboarding-capsules-grid" id="valuesGrid"></div>
-                    
-                    <button class="onboarding-btn" id="screen6Button" onclick="nextOnboardingScreen(7)">
-                        Далее
-                    </button>
-                </div>
-            </div>
-
-            <!-- Экран 7: Музыка -->
-            <div class="onboarding-screen" id="screen7">
-                <div class="onboarding-header">
-                    <h2 class="profile-section-title">Любимая музыка</h2>
-                    <p class="onboarding-subtitle">Выбери до 3 любимых жанров</p>
-                </div>
-                
-                <div class="onboarding-board">
-                    <div class="onboarding-selected-tags" id="musicTags"></div>
-                    <div class="selection-counter" id="musicCounter">Выбрано: 0/3</div>
-                    <div class="selection-required" id="screen7Message">Выберите до 3 жанров</div>
-                    <div class="onboarding-capsules-grid" id="musicGrid"></div>
-                    
-                    <button class="onboarding-btn" id="screen7Button" onclick="nextOnboardingScreen(8)">
-                        Продолжить
-                    </button>
-                </div>
-            </div>
-
-            <!-- Экран 8: Фильмы -->
-            <div class="onboarding-screen" id="screen8">
-                <div class="onboarding-header">
-                    <h2 class="profile-section-title">Любимые фильмы</h2>
-                    <p class="onboarding-subtitle">Выбери до 3 любимых жанров</p>
-                </div>
-                
-                <div class="onboarding-board">
-                    <div class="onboarding-selected-tags" id="moviesTags"></div>
-                    <div class="selection-counter" id="moviesCounter">Выбрано: 0/3</div>
-                    <div class="selection-required" id="screen8Message">Выберите до 3 жанров</div>
-                    <div class="onboarding-capsules-grid" id="moviesGrid"></div>
-                    
-                    <button class="onboarding-btn" id="screen8Button" onclick="nextOnboardingScreen(9)">
-                        Продолжить
-                    </button>
-                </div>
-            </div>
-
-            <!-- Экран 9: Хобби -->
-            <div class="onboarding-screen" id="screen9">
-                <div class="onboarding-header">
-                    <h2 class="profile-section-title">Хобби и увлечения</h2>
-                    <p class="onboarding-subtitle">Выбери до 3 своих увлечений</p>
-                </div>
-                
-                <div class="onboarding-board">
-                    <div class="onboarding-selected-tags" id="hobbiesTags"></div>
-                    <div class="selection-counter" id="hobbiesCounter">Выбрано: 0/3</div>
-                    <div class="selection-required" id="screen9Message">Выберите до 3 увлечений</div>
-                    <div class="onboarding-capsules-grid" id="hobbiesGrid"></div>
-                    
-                    <button class="onboarding-btn" id="screen9Button" onclick="nextOnboardingScreen(10)">
-                        Продолжить
-                    </button>
-                </div>
-            </div>
-
-            <!-- Экран 10: Мероприятия -->
-            <div class="onboarding-screen" id="screen10">
-                <div class="onboarding-header">
-                    <h2 class="profile-section-title">Мероприятия</h2>
-                    <p class="onboarding-subtitle">Куда бы хотел сходить с кем-то?</p>
-                </div>
-                
-                <div class="onboarding-board">
-                    <div class="onboarding-selected-tags" id="eventsTags"></div>
-                    <div class="selection-counter" id="eventsCounter">Выбрано: 0/3</div>
-                    <div class="selection-required" id="screen10Message">Выберите до 3 мероприятий</div>
-                    <div class="onboarding-capsules-grid" id="eventsGrid"></div>
-                    
-                    <button class="onboarding-btn" id="screen10Button" onclick="completeOnboarding()">
-                        Завершить профиль
-                    </button>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    initOnboarding();
-}
-
-// Функция для разделения строки по запятым
-function splitStringByCommas(str) {
-    if (!str) return [];
-    return str.split(',').map(item => item.trim()).filter(item => item !== '');
-}
-
-// Загрузка основного контента (карточки пользователей)
-async function loadMainContent(userData) {
-    console.log('Загрузка основного контента:', userData);
-    
-    const mainContent = document.getElementById('mainContent');
-    const body = document.body;
-    
-    body.classList.remove('onboarding-mode');
-    currentUserIndex = 0;
-
-    // Показываем загрузку
-    mainContent.innerHTML = `
-        <div class="main-app">
-            <div class="cards-container">
-                <div class="loading-message">
-                    <div class="loading-spinner"></div>
-                    <p>Ищем подходящие анкеты...</p>
-                </div>
-            </div>
-        </div>
-    `;
-
-    // Загружаем рекомендации
-    recommendedUsers = await loadRecommendations();
-    
-    if (recommendedUsers.length === 0) {
-        // Если рекомендаций нет, показываем сообщение
-        mainContent.innerHTML = `
-            <div class="main-app">
-                <div class="cards-container">
-                    <div class="no-users-message">
-                        <div class="message-icon">🔍</div>
-                        <h3>Пока нет рекомендаций</h3>
-                        <p>Попробуйте обновить позже или измените параметры поиска</p>
-                    </div>
-                </div>
-            </div>
-        `;
-        return;
-    }
-
-    // Показываем карточки
-    mainContent.innerHTML = `
-        <div class="main-app">
-            <div class="cards-container">
-                <div class="no-users-message" id="noUsersMessage" style="display: none;">
-                    <div class="message-icon">💫</div>
-                    <h3>Анкеты закончились</h3>
-                    <p>Возвращайтесь позже, чтобы увидеть новые рекомендации</p>
-                </div>
-                
-                <div class="user-card" id="userCard">
-                    <div class="card-background"></div>
-                    <div class="swipe-overlay swipe-like"></div>
-                    <div class="swipe-overlay swipe-dislike"></div>
-                    <div class="card-content">
-                        <div class="card-main-info">
-                            <h2 class="user-name" id="userName">Имя</h2>
-                            <div class="user-age-city" id="userAgeCity">Возраст • Город</div>
-                            <div class="user-events-tags" id="userEventsTags"></div>
-                        </div>
-                        
-                        <button class="show-more-btn" onclick="toggleUserDetails()">
-                            Показать больше
-                            <span class="arrow">▼</span>
-                        </button>
-                        
-                        <div class="user-details" id="userDetails">
-                            <div class="details-section">
-                                <h4>О себе</h4>
-                                <div class="detail-item">
-                                    <span class="detail-label">Карьера:</span>
-                                    <span class="detail-value" id="detailCareer">-</span>
-                                </div>
-                                <div class="detail-item">
-                                    <span class="detail-label">Характер:</span>
-                                    <span class="detail-value" id="detailPersonality">-</span>
-                                </div>
-                                <div class="detail-item">
-                                    <span class="detail-label">Цели отношений:</span>
-                                    <span class="detail-value" id="detailRelationship">-</span>
-                                </div>
-                                <div class="detail-item">
-                                    <span class="detail-label">Ценности:</span>
-                                    <span class="detail-value" id="detailValues">-</span>
-                                </div>
-                            </div>
-                            
-                            <div class="details-section">
-                                <h4>Интересы</h4>
-                                <div class="detail-item">
-                                    <span class="detail-label">Музыка:</span>
-                                    <span class="detail-value tags-container" id="detailMusic"></span>
-                                </div>
-                                <div class="detail-item">
-                                    <span class="detail-label">Фильмы:</span>
-                                    <span class="detail-value tags-container" id="detailMovies"></span>
-                                </div>
-                                <div class="detail-item">
-                                    <span class="detail-label">Хобби:</span>
-                                    <span class="detail-value tags-container" id="detailHobbies"></span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    loadNextUser();
-    initSwipeHandlers();
-}
-
-// Загрузка следующего пользователя
-function loadNextUser() {
-    if (currentUserIndex >= recommendedUsers.length) {
-        document.getElementById('noUsersMessage').style.display = 'flex';
-        document.getElementById('userCard').style.display = 'none';
-        return;
-    }
-    
-    const user = recommendedUsers[currentUserIndex];
-    const userCard = document.getElementById('userCard');
-    
-    // Анимация появления
-    userCard.style.opacity = '0';
-    userCard.style.transform = 'translateY(20px)';
-    
-    setTimeout(() => {
-        // Обновляем данные из структуры UserDB
-        document.getElementById('userName').textContent = user.name || 'Не указано';
-        document.getElementById('userAgeCity').textContent = `${user.age || '?'} • ${user.city || 'Не указан'}`;
-        
-        // Обрабатываем мероприятия как теги
-        const eventsTagsContainer = document.getElementById('userEventsTags');
-        eventsTagsContainer.innerHTML = '';
-        const events = splitStringByCommas(user.event_preferences);
-        if (events.length > 0) {
-            events.forEach(event => {
-                const tag = document.createElement('span');
-                tag.className = 'event-tag';
-                tag.textContent = event;
-                eventsTagsContainer.appendChild(tag);
-            });
-        } else {
-            eventsTagsContainer.innerHTML = '<span class="no-data">Не указаны</span>';
-        }
-        
-        // Детальная информация
-        document.getElementById('detailCareer').textContent = user.career_type || 'Не указана';
-        document.getElementById('detailPersonality').textContent = user.personality_type || 'Не указан';
-        document.getElementById('detailRelationship').textContent = user.relationship_goal || 'Не указаны';
-        document.getElementById('detailValues').textContent = user.important_values || 'Не указаны';
-        
-        // Обрабатываем интересы как теги
-        updateTagsContainer('detailMusic', user.music);
-        updateTagsContainer('detailMovies', user.films);
-        updateTagsContainer('detailHobbies', user.hobbies);
-        
-        // Сбрасываем детали и подсветку
-        document.getElementById('userDetails').classList.remove('active');
-        resetSwipeOverlay();
-        
-        // Анимация появления
-        userCard.style.opacity = '1';
-        userCard.style.transform = 'translateY(0)';
-    }, 200);
-}
-
-// Обновление контейнера с тегами
-function updateTagsContainer(containerId, data) {
-    const container = document.getElementById(containerId);
-    container.innerHTML = '';
-    
-    const tags = splitStringByCommas(data);
-    if (tags.length > 0) {
-        tags.forEach(tag => {
-            const tagElement = document.createElement('span');
-            tagElement.className = 'interest-tag';
-            tagElement.textContent = tag;
-            container.appendChild(tagElement);
-        });
-    } else {
-        container.innerHTML = '<span class="no-data">Не указаны</span>';
-    }
-}
-
-// Переключение детальной информации
-function toggleUserDetails() {
-    const details = document.getElementById('userDetails');
-    const arrow = document.querySelector('.arrow');
-    
-    details.classList.toggle('active');
-    arrow.style.transform = details.classList.contains('active') ? 'rotate(180deg)' : 'rotate(0)';
-}
-
-// Отправка лайка/дизлайка на сервер
-async function sendInteraction(targetUserId, isLike) {
-    try {
-        const currentUserId = await getCurrentUser();
-        const interactionType = isLike ? 'like' : 'dislike';
-        
-        console.log(`Отправка взаимодействия: ${interactionType} для пользователя ${targetUserId}`);
-        
-        const response = await fetch('http://localhost:8080/interaction', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                user_id: currentUserId,
-                target_user_id: targetUserId,
-                interaction_type: interactionType
-            })
-        });
-        
-        if (response.ok) {
-            console.log('Взаимодействие успешно отправлено');
-        } else {
-            console.error('Ошибка при отправке взаимодействия:', response.status);
-        }
-    } catch (error) {
-        console.error('Ошибка при отправке взаимодействия:', error);
-    }
-}
-
-// Инициализация свайпов
-function initSwipeHandlers() {
-    const card = document.getElementById('userCard');
-    if (!card) return;
-    
-    card.addEventListener('touchstart', handleTouchStart, { passive: false });
-    card.addEventListener('touchmove', handleTouchMove, { passive: false });
-    card.addEventListener('touchend', handleTouchEnd);
-    
-    card.addEventListener('mousedown', handleMouseDown);
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-}
-
-// Обработчики для тач-событий
-function handleTouchStart(e) {
-    if (e.touches.length > 1) return;
-    
-    const touch = e.touches[0];
-    startX = touch.clientX;
-    currentX = startX;
-    isDragging = true;
-    
-    const card = document.getElementById('userCard');
-    card.style.transition = 'none';
-    resetSwipeOverlay();
-}
-
-function handleTouchMove(e) {
-    if (!isDragging || e.touches.length > 1) return;
-    
-    e.preventDefault();
-    const touch = e.touches[0];
-    currentX = touch.clientX;
-    updateCardPosition();
-    updateSwipeOverlay();
-}
-
-function handleTouchEnd() {
-    if (!isDragging) return;
-    
-    isDragging = false;
-    handleSwipeEnd();
-}
-
-// Обработчики для мыши
-function handleMouseDown(e) {
-    startX = e.clientX;
-    currentX = startX;
-    isDragging = true;
-    
-    const card = document.getElementById('userCard');
-    card.style.transition = 'none';
-    resetSwipeOverlay();
-}
-
-function handleMouseMove(e) {
-    if (!isDragging) return;
-    
-    currentX = e.clientX;
-    updateCardPosition();
-    updateSwipeOverlay();
-}
-
-function handleMouseUp() {
-    if (!isDragging) return;
-    
-    isDragging = false;
-    handleSwipeEnd();
-}
-
-// Обновление позиции карточки
-function updateCardPosition() {
-    const card = document.getElementById('userCard');
-    const deltaX = currentX - startX;
-    const rotation = deltaX * 0.1;
-    
-    card.style.transform = `translateX(${deltaX}px) rotate(${rotation}deg)`;
-}
-
-// Обновление подсветки свайпа
-function updateSwipeOverlay() {
-    const deltaX = currentX - startX;
-    const swipeThreshold = 50;
-    
-    const likeOverlay = document.querySelector('.swipe-like');
-    const dislikeOverlay = document.querySelector('.swipe-dislike');
-    
-    if (!likeOverlay || !dislikeOverlay) return;
-    
-    // Сбрасываем все подсветки
-    likeOverlay.style.opacity = '0';
-    dislikeOverlay.style.opacity = '0';
-    
-    if (deltaX > swipeThreshold) {
-        // Свайп вправо - лайк (зеленая подсветка)
-        likeOverlay.style.opacity = Math.min((deltaX - swipeThreshold) / 100, 0.3).toString();
-    } else if (deltaX < -swipeThreshold) {
-        // Свайп влево - дизлайк (красная подсветка)
-        dislikeOverlay.style.opacity = Math.min(Math.abs(deltaX + swipeThreshold) / 100, 0.3).toString();
-    }
-}
-
-// Сброс подсветки свайпа
-function resetSwipeOverlay() {
-    const likeOverlay = document.querySelector('.swipe-like');
-    const dislikeOverlay = document.querySelector('.swipe-dislike');
-    
-    if (!likeOverlay || !dislikeOverlay) return;
-    
-    likeOverlay.style.opacity = '0';
-    dislikeOverlay.style.opacity = '0';
-}
-
-// Обработка завершения свайпа
-function handleSwipeEnd() {
-    const card = document.getElementById('userCard');
-    if (!card) return;
-    
-    const deltaX = currentX - startX;
-    const swipeThreshold = 100;
-    
-    card.style.transition = 'all 0.5s ease';
-    
-    if (Math.abs(deltaX) > swipeThreshold) {
-        // Свайп влево (дизлайк) или вправо (лайк)
-        const direction = deltaX > 0 ? 1 : -1;
-        const isLike = deltaX > 0;
-        
-        card.style.transform = `translateX(${direction * 500}px) rotate(${direction * 30}deg)`;
-        card.style.opacity = '0';
-        
-        // Отправляем взаимодействие на сервер
-        const currentUser = recommendedUsers[currentUserIndex];
-        if (currentUser) {
-            sendInteraction(currentUser.id, isLike);
-        }
-        
-        setTimeout(() => {
-            currentUserIndex++;
-            loadNextUser();
-            resetCardPosition();
-        }, 300);
-        
-        console.log(isLike ? 'Лайк' : 'Дизлайк', recommendedUsers[currentUserIndex]?.name);
-        
-    } else {
-        // Возвращаем карточку на место
-        resetCardPosition();
-    }
-    
-    resetSwipeOverlay();
-}
-
-// Сброс позиции карточки
-function resetCardPosition() {
-    const card = document.getElementById('userCard');
-    if (!card) return;
-    
-    card.style.transform = 'translateX(0) rotate(0)';
-    card.style.opacity = '1';
-}
-
-// Инициализация анкеты
-function initOnboarding() {
-    console.log('Инициализация анкеты...');
-    
-    const capsuleData = {
-        career: ['IT и технологии', 'Дизайн и UX', 'Медицина', 'Образование', 'Бизнес', 'Финансы', 'Маркетинг', 'Искусство', 'Музыка', 'Кино', 'Фотография', 'Архитектура', 'Инженерия', 'Недвижимость', 'Юриспруденция', 'Психология'],
-        personality: ['Экстраверт', 'Интроверт', 'Амбиверт', 'Аналитик', 'Творец', 'Прагматик', 'Романтик', 'Реалист', 'Оптимист', 'Философ', 'Новатор', 'Лидер', 'Целеустремленный', 'Гибкий', 'Настойчивый', 'Командный'],
-        relationship: ['Серьезные отношения', 'Дружба', 'Несерьезные отношения', 'Создание семьи', 'Поиск партнера', 'Романтика', 'Деловое партнерство', 'Творчество', 'Путешествия', 'Совместные проекты', 'Духовность', 'Карьера'],
-        values: ['Любовь и забота', 'Семья', 'Карьера', 'Финансы', 'Духовность', 'Здоровье', 'Образование', 'Творчество', 'Свобода', 'Приключения', 'Безопасность', 'Экология'],
-        music: ['Поп', 'Рок', 'Хип-хоп', 'Электроника', 'Джаз', 'Классика', 'R&B', 'Метал', 'Инди', 'Фолк', 'Кантри', 'Регги', 'Блюз', 'Соул', 'Диско', 'Альтернатива', 'Рэп'],
-        movies: ['Комедия', 'Драма', 'Боевик', 'Триллер', 'Ужасы', 'Фантастика', 'Фэнтези', 'Мелодрама', 'Детектив', 'Приключения', 'Аниме', 'Документальный', 'Артхаус', 'Исторический', 'Криминал', 'Мюзикл'],
-        hobbies: ['Спорт', 'Путешествия', 'Кулинария', 'Фотография', 'Рисование', 'Танцы', 'Йога', 'Велоспорт', 'Гейминг', 'Чтение', 'Садоводство', 'Рукоделие', 'Музыка', 'Театр', 'Кино', 'Настолки', 'Рыбалка', 'Охота', 'Авто', 'Технологии'],
-        events: ['Концерты', 'Кино', 'Выставки', 'Театры', 'Фестивали', 'Спортивные события', 'Вечеринки', 'Клубы', 'Рестораны', 'Кафе', 'Пикники', 'Походы', 'Мастер-классы', 'Лекции', 'Йога-сессии', 'Танцы', 'Настольные игры', 'Караоке', 'Боулинг', 'Картинг']
-    };
-
-    Object.keys(capsuleData).forEach(category => {
-        const grid = document.getElementById(`${category}Grid`);
-        if (!grid) {
-            console.error('Не найден контейнер для:', category);
-            return;
+        if (!userId) {
+            throw new Error('No user ID available for update');
         }
 
-        grid.innerHTML = '';
-        capsuleData[category].forEach(item => {
-            const capsule = document.createElement('div');
-            capsule.className = 'onboarding-capsule';
-            
-            if (['music', 'movies', 'hobbies', 'events'].includes(category)) {
-                capsule.classList.add('multiple');
-            }
-            
-            capsule.textContent = item;
-            capsule.addEventListener('click', () => toggleOnboardingCapsule(category, item, capsule));
-            grid.appendChild(capsule);
-        });
-        
-        console.log(`Загружено ${capsuleData[category].length} элементов для ${category}`);
-    });
-
-    updateOnboardingProgress();
-}
-
-// Обновление базовой информации
-function updateBasicInfo(field, value) {
-    console.log(`Обновление ${field}:`, value);
-    userBasicInfo[field] = value;
-    checkScreen2Complete();
-}
-
-// Проверка заполненности второго экрана
-function checkScreen2Complete() {
-    const isComplete = userBasicInfo.age && userBasicInfo.city;
-    const button = document.getElementById('screen2Button');
-    const message = document.getElementById('screen2Message');
-    
-    console.log('Проверка экрана 2:', { isComplete, age: userBasicInfo.age, city: userBasicInfo.city });
-    
-    if (button) {
-        if (isComplete) {
-            button.classList.add('active');
-            if (message) message.textContent = '';
-        } else {
-            button.classList.remove('active');
-            if (message) message.textContent = 'Заполните возраст и город';
-        }
-    }
-    return isComplete;
-}
-
-// Переключение капсулы
-function toggleOnboardingCapsule(category, text, capsule) {
-    console.log(`Клик по капсуле: ${category} - ${text}`);
-    
-    const index = selectedOnboardingItems[category].indexOf(text);
-    const isMultiple = ['music', 'movies', 'hobbies', 'events'].includes(category);
-    const maxSelection = 3;
-    
-    if (index === -1) {
-        if (isMultiple) {
-            if (selectedOnboardingItems[category].length >= maxSelection) {
-                console.log('Достигнут лимит выбора для', category);
-                return;
-            }
-            selectedOnboardingItems[category].push(text);
-            capsule.classList.add('selected');
-        } else {
-            document.querySelectorAll(`#${category}Grid .onboarding-capsule`).forEach(c => {
-                c.classList.remove('selected');
-            });
-            selectedOnboardingItems[category] = [text];
-            capsule.classList.add('selected');
-        }
-    } else {
-        selectedOnboardingItems[category].splice(index, 1);
-        capsule.classList.remove('selected');
-    }
-    
-    console.log(`Текущий выбор для ${category}:`, selectedOnboardingItems[category]);
-    
-    updateOnboardingTags(category);
-    updateSelectionCounter(category);
-    
-    if (isMultiple) {
-        updateMultipleSelectionButtonState(category);
-    } else {
-        updateCapsulesButtonState(category);
-    }
-}
-
-// Обновление тегов
-function updateOnboardingTags(category) {
-    const tagsContainer = document.getElementById(`${category}Tags`);
-    if (!tagsContainer) return;
-    
-    tagsContainer.innerHTML = '';
-    
-    selectedOnboardingItems[category].forEach(item => {
-        const tag = document.createElement('div');
-        tag.className = 'onboarding-selected-tag';
-        tag.innerHTML = `${item} <span class="remove-tag" onclick="removeSelectedItem('${category}', '${item}')">×</span>`;
-        tagsContainer.appendChild(tag);
-    });
-}
-
-// Удаление выбранного элемента
-function removeSelectedItem(category, item) {
-    console.log(`Удаление: ${category} - ${item}`);
-    
-    const index = selectedOnboardingItems[category].indexOf(item);
-    if (index !== -1) {
-        selectedOnboardingItems[category].splice(index, 1);
-        
-        const grid = document.getElementById(`${category}Grid`);
-        if (grid) {
-            const capsules = grid.querySelectorAll('.onboarding-capsule');
-            capsules.forEach(capsule => {
-                if (capsule.textContent === item) {
-                    capsule.classList.remove('selected');
-                }
-            });
-        }
-        
-        updateOnboardingTags(category);
-        updateSelectionCounter(category);
-        
-        if (['music', 'movies', 'hobbies', 'events'].includes(category)) {
-            updateMultipleSelectionButtonState(category);
-        } else {
-            updateCapsulesButtonState(category);
-        }
-    }
-}
-
-// Обновление счетчика выбора
-function updateSelectionCounter(category) {
-    const counter = document.getElementById(`${category}Counter`);
-    if (!counter) return;
-    
-    const count = selectedOnboardingItems[category].length;
-    const maxSelection = 3;
-    counter.textContent = `Выбрано: ${count}/${maxSelection}`;
-    
-    if (count >= maxSelection) {
-        counter.style.color = '#ffaa00';
-    } else {
-        counter.style.color = 'rgba(255, 170, 0, 0.7)';
-    }
-}
-
-// Обновление состояния кнопок для одиночного выбора
-function updateCapsulesButtonState(category) {
-    const screenNumber = getScreenByCategory(category);
-    const button = document.getElementById(`screen${screenNumber}Button`);
-    const message = document.getElementById(`screen${screenNumber}Message`);
-    
-    if (button) {
-        const hasSelection = selectedOnboardingItems[category].length > 0;
-        console.log(`Обновление кнопки экрана ${screenNumber}:`, hasSelection);
-        
-        if (hasSelection) {
-            button.classList.add('active');
-            if (message) message.textContent = '';
-        } else {
-            button.classList.remove('active');
-            if (message) message.textContent = 'Выберите вариант для продолжения';
-        }
-    }
-}
-
-// Обновление состояния кнопки для множественного выбора
-function updateMultipleSelectionButtonState(category) {
-    const screenNumber = getScreenByCategory(category);
-    const button = document.getElementById(`screen${screenNumber}Button`);
-    const message = document.getElementById(`screen${screenNumber}Message`);
-    
-    if (button) {
-        const count = selectedOnboardingItems[category].length;
-        console.log(`Обновление кнопки множественного выбора ${screenNumber}:`, count);
-        
-        if (count > 0) {
-            button.classList.add('active');
-            if (message) message.textContent = '';
-        } else {
-            button.classList.remove('active');
-            if (message) message.textContent = 'Выберите до 3 вариантов';
-        }
-    }
-}
-
-// Вспомогательные функции
-function getCategoryByScreen(screenNumber) {
-    const categories = ['career', 'personality', 'relationship', 'values', 'music', 'movies', 'hobbies', 'events'];
-    return categories[screenNumber - 3] || 'career';
-}
-
-function getScreenByCategory(category) {
-    const categories = ['career', 'personality', 'relationship', 'values', 'music', 'movies', 'hobbies', 'events'];
-    return categories.indexOf(category) + 3;
-}
-
-// Переход между экранами
-function nextOnboardingScreen(screenNumber) {
-    console.log(`Переход с экрана ${currentOnboardingScreen} на ${screenNumber}`);
-    
-    if (currentOnboardingScreen === 2 && !checkScreen2Complete()) {
-        console.log('Нельзя перейти - не заполнены основные поля');
-        return;
-    }
-    
-    if (currentOnboardingScreen >= 3 && currentOnboardingScreen <= 6) {
-        const currentCategory = getCategoryByScreen(currentOnboardingScreen);
-        if (selectedOnboardingItems[currentCategory].length === 0) {
-            console.log('Нельзя перейти - не выбран вариант');
-            return;
-        }
-    }
-    
-    if (currentOnboardingScreen >= 7) {
-        const currentCategory = getCategoryByScreen(currentOnboardingScreen);
-        if (selectedOnboardingItems[currentCategory].length === 0) {
-            console.log('Нельзя перейти - не выбрано ни одного варианта');
-            return;
-        }
-    }
-    
-    const currentScreen = document.getElementById(`screen${currentOnboardingScreen}`);
-    const nextScreen = document.getElementById(`screen${screenNumber}`);
-    
-    if (currentScreen) currentScreen.classList.remove('active');
-    if (nextScreen) nextScreen.classList.add('active');
-    
-    currentOnboardingScreen = screenNumber;
-    updateOnboardingProgress();
-}
-
-// Обновление прогресса
-function updateOnboardingProgress() {
-    const progressFill = document.getElementById('onboardingProgressFill');
-    if (!progressFill) return;
-    
-    const progress = (currentOnboardingScreen - 1) / 9 * 100;
-    progressFill.style.width = progress + '%';
-    console.log(`Прогресс: ${progress}%`);
-}
-
-// Завершение онбординга
-async function completeOnboarding() {
-    console.log('Завершение онбординга...');
-    console.log('Собранные данные:', {
-        basic: userBasicInfo,
-        selections: selectedOnboardingItems
-    });
-    
-    try {
-        const userId = await getCurrentUser();
-        const profileData = {
-            id: userId,
-            age: parseInt(userBasicInfo.age),
-            city: userBasicInfo.city,
-            career_type: selectedOnboardingItems.career[0] || '',
-            personality_type: selectedOnboardingItems.personality[0] || '',
-            relationship_goal: selectedOnboardingItems.relationship[0] || '',
-            important_values: selectedOnboardingItems.values[0] || '',
-            music: selectedOnboardingItems.music.join(',') || '',
-            films: selectedOnboardingItems.movies.join(',') || '',
-            hobbies: selectedOnboardingItems.hobbies.join(',') || '',
-            event_preferences: selectedOnboardingItems.events.join(',') || ''
-        };
-
-        console.log('Отправка данных на сервер:', profileData);
-        
-        const response = await fetch('http://localhost:8080/createuser', {
+        const response = await fetch(`${API_BASE_URL}/updateuser?id=${userId}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -1109,36 +242,408 @@ async function completeOnboarding() {
             body: JSON.stringify(profileData)
         });
         
-        if (response.ok) {
-            console.log(response)
-            const result = await response.json();
-            console.log('Успешный ответ сервера:', result);
-            location.reload()
-        } else {
-            location.reload()
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
         }
+        
+        return await response.json();
     } catch (error) {
-        location.reload()
+        console.error('Ошибка обновления профиля:', error);
+        throw error;
     }
 }
 
-function editProfile() {
-    console.log('Редактирование профиля...');
-    loadOnboarding();
-}
+function parseServerData(userData) {
+    if (!userData) return {
+        name: '',
+        surname: '',
+        age: '',
+        city: '',
+        careerPlace: ''
+    };
 
-// Основная функция
-async function initApp() {
-    console.log('Инициализация приложения...');
-    const authStatus = await checkUserAuthorization();
-    console.log('Статус авторизации:', authStatus);
+    const parseArray = (str) => {
+        if (!str || str === 'null' || str === 'undefined') return [];
+        return str.split(',').map(item => item.trim()).filter(item => item && item !== 'null' && item !== 'undefined');
+    };
     
-    if (authStatus.authorized) {
-        loadMainContent(authStatus.userData);
-    } else {
-        loadOnboarding();
+    selectedItems.career = parseArray(userData.career_type).slice(0, maxSelections.career);
+    selectedItems.personality = parseArray(userData.personality_type).slice(0, maxSelections.personality);
+    selectedItems.relationship = parseArray(userData.relationship_goal).slice(0, maxSelections.relationship);
+    selectedItems.values = parseArray(userData.important_values).slice(0, maxSelections.values);
+    selectedItems.music = parseArray(userData.music).slice(0, maxSelections.music);
+    selectedItems.hobbies = parseArray(userData.hobbies).slice(0, maxSelections.hobbies);
+    selectedItems.movies = parseArray(userData.films).slice(0, maxSelections.movies);
+    selectedItems.events = parseArray(userData.event_preferences).slice(0, maxSelections.events);
+
+    userGender = userData.gender !== undefined ? parseInt(userData.gender) : 0;
+    preferredGender = userData.preferred_gender !== undefined ? parseInt(userData.preferred_gender) : 1;
+    
+    return {
+        name: userData.name || '',
+        surname: userData.surname || '',
+        age: userData.age || '',
+        city: userData.city || '',
+        careerPlace: userData.career_place || ''
+    };
+}
+
+function prepareDataForServer(profileData) {
+    const userId = currentUserId || (async () => await getCurrentUser())();
+    
+    return {
+        id: userId,
+        name: profileData.name || '',
+        surname: profileData.surname || '',
+        age: parseInt(profileData.age) || 0,
+        city: profileData.city || '',
+        gender: userGender,
+        preferred_gender: preferredGender,
+        career_place: profileData.careerPlace || '',
+        career_type: (profileData.career || []).join(','),
+        personality_type: (profileData.personality || []).join(','),
+        relationship_goal: (profileData.relationship || []).join(','),
+        important_values: (profileData.values || []).join(','),
+        music: (profileData.music || []).join(','),
+        hobbies: (profileData.hobbies || []).join(','),
+        films: (profileData.movies || []).join(','),
+        event_preferences: (profileData.events || []).join(',')
+    };
+}
+
+async function loadProfileData() {
+    try {
+        const userData = await fetchUserProfile();
+        const parsedData = parseServerData(userData);
+
+        // Обновляем UI элементы
+        updateUIElement('nameValue', parsedData.name);
+        updateUIElement('ageValue', parsedData.age ? parsedData.age + ' лет' : '');
+        updateUIElement('cityValue', parsedData.city);
+
+        updateGenderDisplay();
+        updatePreferredGenderDisplay();
+        updateAllSelectedCapsules();
+    } catch (error) {
+        console.error('Ошибка загрузки данных профиля:', error);
     }
 }
 
-// Запуск
-document.addEventListener('DOMContentLoaded', initApp);
+function updateUIElement(elementId, value) {
+    const element = document.getElementById(elementId);
+    if (element) {
+        element.textContent = value;
+    }
+}
+
+function updateGenderDisplay() {
+    const genderValue = document.getElementById('genderValue');
+    if (genderValue) {
+        genderValue.textContent = userGender === 0 ? 'Мужской' : 'Женский';
+    }
+}
+
+function updatePreferredGenderDisplay() {
+    const preferredGenderValue = document.getElementById('preferredGenderValue');
+    if (preferredGenderValue) {
+        switch(preferredGender) {
+            case 0:
+                preferredGenderValue.textContent = 'Мужчин';
+                break;
+            case 1:
+                preferredGenderValue.textContent = 'Женщин';
+                break;
+            case 2:
+                preferredGenderValue.textContent = 'Всех';
+                break;
+            default:
+                preferredGenderValue.textContent = 'Женщин';
+        }
+    }
+}
+
+function updateAllSelectedCapsules() {
+    Object.keys(selectedItems).forEach(category => {
+        updateSelectedCapsulesForCategory(category);
+    });
+}
+
+function updateSelectedCapsulesForCategory(category) {
+    const grid = document.getElementById(`${category}Grid`);
+    const tagsContainer = document.getElementById(`${category}Tags`);
+    
+    if (!grid || !tagsContainer) return;
+
+    tagsContainer.innerHTML = '';
+
+    selectedItems[category].forEach(item => {
+        addTag(category, item, tagsContainer);
+    });
+
+    const capsules = grid.querySelectorAll('.capsule');
+    capsules.forEach(capsule => {
+        const capsuleText = capsule.textContent;
+
+        capsule.classList.remove('selected', 'disabled');
+
+        if (selectedItems[category].includes(capsuleText)) {
+            capsule.classList.add('selected');
+        }
+
+        if (selectedItems[category].length >= maxSelections[category] && 
+            !selectedItems[category].includes(capsuleText)) {
+            capsule.classList.add('disabled');
+        }
+    });
+}
+
+function toggleExpand(gridId, button) {
+    const grid = document.getElementById(gridId);
+    if (!grid) return;
+
+    const isExpanded = grid.classList.contains('expanded');
+    
+    if (isExpanded) {
+        grid.classList.remove('expanded');
+        button.querySelector('span:first-child').textContent = 'Показать все';
+    } else {
+        grid.classList.add('expanded');
+        button.querySelector('span:first-child').textContent = 'Скрыть';
+    }
+
+    const icon = button.querySelector('.expand-icon');
+    if (icon) {
+        icon.style.transform = isExpanded ? 'rotate(0deg)' : 'rotate(180deg)';
+    }
+}
+
+async function initCapsules() {
+    try {
+        // Ждем загрузки WebApp перед инициализацией
+        await waitForWebApp();
+        
+        Object.keys(capsuleData).forEach(category => {
+            const grid = document.getElementById(`${category}Grid`);
+            const tagsContainer = document.getElementById(`${category}Tags`);
+            
+            if (!grid) {
+                console.warn(`Element with id ${category}Grid not found`);
+                return;
+            }
+
+            const shuffledItems = [...capsuleData[category]].sort(() => Math.random() - 0.5);
+            
+            shuffledItems.forEach(item => {
+                const capsule = document.createElement('div');
+                capsule.className = 'capsule';
+                capsule.textContent = item;
+                
+                capsule.addEventListener('click', () => toggleCapsule(category, item, capsule, tagsContainer));
+                grid.appendChild(capsule);
+            });
+        });
+
+        await loadProfileData();
+        makeFieldsReadonly();
+
+    } catch (error) {
+        console.error('Ошибка инициализации капсул:', error);
+    }
+}
+
+function makeFieldsReadonly() {
+    const nameField = document.querySelector('[onclick="openModal(\'name\')"]');
+    const cityField = document.querySelector('[onclick="openModal(\'city\')"]');
+    
+    if (nameField) {
+        nameField.style.pointerEvents = 'none';
+        nameField.style.opacity = '0.7';
+        nameField.style.cursor = 'default';
+        nameField.title = 'Имя нельзя изменить';
+    }
+    
+    if (cityField) {
+        cityField.style.pointerEvents = 'none';
+        cityField.style.opacity = '0.7';
+        cityField.style.cursor = 'default';
+        cityField.title = 'Город нельзя изменить';
+    }
+}
+
+function toggleCapsule(category, text, capsule, tagsContainer) {
+    const maxSelect = maxSelections[category];
+    const currentSelected = selectedItems[category];
+
+    if (currentSelected.includes(text)) {
+        selectedItems[category] = currentSelected.filter(item => item !== text);
+    } 
+    else if (currentSelected.length < maxSelect) {
+        if (maxSelect === 1) {
+            selectedItems[category] = [text];
+        } else {
+            selectedItems[category] = [...currentSelected, text];
+        }
+    }
+    else {
+        return;
+    }
+
+    updateSelectedCapsulesForCategory(category);
+}
+
+function addTag(category, text, container) {
+    const tag = document.createElement('div');
+    tag.className = 'selected-tag';
+    tag.innerHTML = `
+        ${text}
+        <span class="remove-tag" onclick="removeTag('${category}', '${text}')">×</span>
+    `;
+    container.appendChild(tag);
+}
+
+function removeTag(category, text) {
+    selectedItems[category] = selectedItems[category].filter(item => item !== text);
+    updateSelectedCapsulesForCategory(category);
+}
+
+function openGenderModal() {
+    const modal = document.getElementById('genderModal');
+    if (modal) {
+        modal.style.display = 'flex';
+        
+        const options = modal.querySelectorAll('.gender-option');
+        options.forEach(option => option.classList.remove('selected'));
+        
+        if (userGender === 0) {
+            options[0].classList.add('selected');
+        } else {
+            options[1].classList.add('selected');
+        }
+    }
+}
+
+function closeGenderModal() {
+    const modal = document.getElementById('genderModal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+}
+
+function selectGender(gender, label) {
+    userGender = gender;
+    updateGenderDisplay();
+    closeGenderModal();
+}
+
+function openPreferredGenderModal() {
+    const modal = document.getElementById('preferredGenderModal');
+    if (modal) {
+        modal.style.display = 'flex';
+        
+        const options = modal.querySelectorAll('.gender-option');
+        options.forEach(option => option.classList.remove('selected'));
+        options[preferredGender].classList.add('selected');
+    }
+}
+
+function closePreferredGenderModal() {
+    const modal = document.getElementById('preferredGenderModal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+}
+
+function selectPreferredGender(gender, label) {
+    preferredGender = gender;
+    updatePreferredGenderDisplay();
+    closePreferredGenderModal();
+}
+
+function openModal(field) {
+    if (field === 'name' || field === 'city') {
+        return;
+    }
+    
+    currentField = field;
+    const modal = document.getElementById('editModal');
+    const title = document.getElementById('modalTitle');
+    const input = document.getElementById('modalInput');
+    
+    const fieldTitles = {
+        age: 'Возраст'
+    };
+    
+    if (!modal || !title || !input) {
+        console.error('Modal elements not found');
+        return;
+    }
+    
+    title.textContent = `Редактирование ${fieldTitles[field]}`;
+    
+    const valueElement = document.getElementById(`${field}Value`);
+    if (valueElement) {
+        input.value = valueElement.textContent.replace(' лет', '');
+    }
+    
+    input.placeholder = `Введите ${fieldTitles[field].toLowerCase()}`;
+    
+    modal.style.display = 'flex';
+    setTimeout(() => input.focus(), 100);
+}
+
+function closeModal() {
+    const modal = document.getElementById('editModal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+}
+
+function saveField() {
+    const value = document.getElementById('modalInput').value;
+    const valueElement = document.getElementById(`${currentField}Value`);
+    
+    if (!valueElement) {
+        console.error(`Element with id ${currentField}Value not found`);
+        return;
+    }
+    
+    if (currentField === 'age') {
+        valueElement.textContent = value + ' лет';
+    }
+    
+    closeModal();
+}
+
+async function saveProfile() {
+    try {
+        const profileData = {
+            name: document.getElementById('nameValue')?.textContent || '',
+            age: document.getElementById('ageValue')?.textContent.replace(' лет', '') || '',
+            city: document.getElementById('cityValue')?.textContent || '',
+            careerPlace: '',
+            career: selectedItems.career,
+            personality: selectedItems.personality,
+            relationship: selectedItems.relationship,
+            values: selectedItems.values,
+            music: selectedItems.music,
+            hobbies: selectedItems.hobbies,
+            movies: selectedItems.movies,
+            events: selectedItems.events
+        };
+        
+        const serverData = prepareDataForServer(profileData);
+        
+        await updateUserProfile(serverData);
+        
+        console.log('Профиль успешно сохранен!');
+    } catch (error) {
+        console.error('Ошибка при сохранении профиля:', error);
+    }
+}
+
+// Инициализация при загрузке DOM
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initCapsules);
+} else {
+    initCapsules();
+}
