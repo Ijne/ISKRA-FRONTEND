@@ -1,5 +1,50 @@
+const crypto = require('crypto');
+
 function getCurrentUser() {
-    return 1;
+    try {
+        const decodedString = decodeURIComponent(initDataString);
+        
+        const params = new URLSearchParams(decodedString);
+        const receivedHash = params.get('hash');
+        
+        if (!receivedHash) {
+            console.error('Hash not found in init data');
+            return 1;
+        }
+        
+        params.delete('hash');
+        
+        const dataPairs = [];
+        for (const [key, value] of params) {
+            dataPairs.push(`${key}=${value}`);
+        }
+        dataPairs.sort();
+        
+        const dataCheckString = dataPairs.join('\n');
+        
+        const secretKey = crypto
+            .createHmac('sha256', 'WebAppData')
+            .update(botToken)
+            .digest();
+        
+        const calculatedHash = crypto
+            .createHmac('sha256', secretKey)
+            .update(dataCheckString)
+            .digest('hex');
+        
+        if (calculatedHash === receivedHash) {
+            const userParam = params.get('user');
+            if (userParam) {
+                const userData = JSON.parse(userParam);
+                return userData.id || null;
+            }
+        }
+        
+        return null;
+    } catch (error) {
+        console.error('Validation error:', error);
+        return 1;
+    }
 }
 
 function setupNavigation() {
