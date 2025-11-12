@@ -1,7 +1,45 @@
-const initData = window.Window.WebApp?.initData
+let initData = null;
+let WebApp = null;
+
+// Ждем загрузки библиотеки Max
+function waitForWebApp() {
+    return new Promise((resolve, reject) => {
+        // Если уже загружено
+        if (window.WebApp) {
+            WebApp = window.WebApp;
+            initData = window.WebApp?.initData;
+            resolve();
+            return;
+        }
+
+        // Проверяем каждые 100мс
+        let attempts = 0;
+        const maxAttempts = 50; // 5 секунд максимум
+        
+        const check = () => {
+            attempts++;
+            if (window.WebApp) {
+                WebApp = window.WebApp;
+                initData = window.WebApp?.initData;
+                console.log('WebApp загружен:', WebApp);
+                console.log('InitData:', initData);
+                resolve();
+            } else if (attempts < maxAttempts) {
+                setTimeout(check, 100);
+            } else {
+                reject(new Error('WebApp не загрузился после всех попыток'));
+            }
+        };
+        
+        check();
+    });
+}
 
 async function getCurrentUser() {
     try {
+        // Ждем загрузки WebApp
+        await waitForWebApp();
+        
         if (!initData) {
             console.error('No init data found');
             return null;
@@ -9,85 +47,108 @@ async function getCurrentUser() {
 
         console.log('Raw initData:', initData);
 
-        const decodedString = decodeURIComponent(initData);
-        console.log('Decoded initData:', decodedString);
-
-        const params = new URLSearchParams(decodedString);
-        const receivedHash = params.get('hash');
+        // Пробуем разные варианты получения данных
+        let decodedString;
         
-        if (!receivedHash) {
-            console.error('Hash not found in init data');
-            return null;
+        // Вариант 1: если initData уже объект
+        if (typeof initData === 'object') {
+            console.log('InitData is object, using directly');
+            const user = initData.user || initData;
+            return user.id || null;
         }
-
-        const userParam = params.get('user');
         
-        const dataPairs = [];
-        for (const [key, value] of params) {
-            if (key !== 'hash') {
-                dataPairs.push(`${key}=${value}`);
-            }
-        }
-        dataPairs.sort();
-        
-        const dataCheckString = dataPairs.join('\n');
-        console.log('Data check string:', dataCheckString);
+        // Вариант 2: если это строка
+        if (typeof initData === 'string') {
+            decodedString = decodeURIComponent(initData);
+            console.log('Decoded initData:', decodedString);
 
-        const botToken = 'f9LHodD0cOLRQi29OdyXpiSqLM-SyPUJnePMbZQH3ceilC7cKmf12ib4C7Oeda975ZN_gzuX6fJmQVKE5j1e';
-        
-        const encoder = new TextEncoder();
-
-        const secretKey = await crypto.subtle.importKey(
-            'raw',
-            encoder.encode('WebAppData'),
-            { name: 'HMAC', hash: 'SHA-256' },
-            false,
-            ['sign']
-        );
-
-        const cryptoKey = await crypto.subtle.sign(
-            'HMAC',
-            secretKey,
-            encoder.encode(botToken)
-        );
-
-        const hmacKey = await crypto.subtle.importKey(
-            'raw',
-            cryptoKey,
-            { name: 'HMAC', hash: 'SHA-256' },
-            false,
-            ['sign']
-        );
-
-        const signature = await crypto.subtle.sign(
-            'HMAC',
-            hmacKey,
-            encoder.encode(dataCheckString)
-        );
-        
-        const calculatedHash = Array.from(new Uint8Array(signature))
-            .map(b => b.toString(16).padStart(2, '0'))
-            .join('');
-        
-        console.log('Calculated hash:', calculatedHash);
-        console.log('Received hash:', receivedHash);
-
-        if (calculatedHash === receivedHash) {
-            console.log('Hash validation successful');
+            const params = new URLSearchParams(decodedString);
+            const receivedHash = params.get('hash');
             
-            if (userParam) {
-                try {
-                    const userData = JSON.parse(userParam);
-                    console.log('User data:', userData);
-                    return userData.id || null;
-                } catch (parseError) {
-                    console.error('Error parsing user data:', parseError);
-                    return null;
+            if (!receivedHash) {
+                console.error('Hash not found in init data');
+                // Пробуем получить user напрямую
+                const userParam = params.get('user');
+                if (userParam) {
+                    try {
+                        const userData = JSON.parse(userParam);
+                        return userData.id || null;
+                    } catch (e) {
+                        console.error('Error parsing user data:', e);
+                    }
+                }
+                return null;
+            }
+
+            const userParam = params.get('user');
+            
+            const dataPairs = [];
+            for (const [key, value] of params) {
+                if (key !== 'hash') {
+                    dataPairs.push(`${key}=${value}`);
                 }
             }
-        } else {
-            console.log('Hash validation failed');
-            return null;
+            dataPairs.sort();
+            
+            const dataCheckString = dataPairs.join('\n');
+            console.log('Data check string:', dataCheckString);
+
+            const botToken = 'f9LHodD0cOLRQi29OdyXpiSqLM-SyPUJnePMbZQH3ceilC7cKmf12ib4C7Oeda975ZN_gzuX6fJmQVKE5j1e';
+            
+            const encoder = new TextEncoder();
+
+            const secretKey = await crypto.subtle.importKey(
+                'raw',
+                encoder.encode('WebAppData'),
+                { name: 'HMAC', hash: 'SHA-256' },
+                false,
+                ['sign']
+            );
+
+            const cryptoKey = await crypto.subtle.sign(
+                'HMAC',
+                secretKey,
+                encoder.encode(botToken)
+            );
+
+            const hmacKey = await crypto.subtle.importKey(
+                'raw',
+                cryptoKey,
+                { name: 'HMAC', hash: 'SHA-256' },
+                false,
+                ['sign']
+            );
+
+            const signature = await crypto.subtle.sign(
+                'HMAC',
+                hmacKey,
+                encoder.encode(dataCheckString)
+            );
+            
+            const calculatedHash = Array.from(new Uint8Array(signature))
+                .map(b => b.toString(16).padStart(2, '0'))
+                .join('');
+            
+            console.log('Calculated hash:', calculatedHash);
+            console.log('Received hash:', receivedHash);
+
+            if (calculatedHash === receivedHash) {
+                console.log('Hash validation successful');
+                
+                if (userParam) {
+                    try {
+                        const userData = JSON.parse(userParam);
+                        console.log('User data:', userData);
+                        return userData.id || null;
+                    } catch (parseError) {
+                        console.error('Error parsing user data:', parseError);
+                        return null;
+                    }
+                }
+            } else {
+                console.log('Hash validation failed');
+                return null;
+            }
         }
         
         return null;
@@ -114,10 +175,15 @@ let userBasicInfo = {
 };
 
 async function checkUserAuthorization() {
-    const userId = await getCurrentUser();
-    console.log('Проверка пользователя:', userId);
-    
     try {
+        const userId = await getCurrentUser();
+        console.log('Проверка пользователя:', userId);
+        
+        if (!userId) {
+            console.log('Пользователь не авторизован');
+            return { authorized: false, userData: null };
+        }
+        
         const response = await fetch(`http://localhost:8080/profile?id=${userId}`);
         
         if (!response.ok) {
@@ -127,7 +193,7 @@ async function checkUserAuthorization() {
         const userData = await response.json();
         console.log('Данные пользователя с сервера:', userData);
         
-        if (userData.id) {
+        if (userData && userData.id) {
             return { authorized: true, userData };
         } else {
             return { authorized: false, userData };
@@ -139,6 +205,8 @@ async function checkUserAuthorization() {
 }
 
 function isProfileComplete(userData) {
+    if (!userData) return false;
+    
     const requiredFields = [
         'name', 'age', 'city', 
         'career_type', 'personality_type', 
@@ -380,7 +448,11 @@ function loadMainContent(userData) {
     body.classList.remove('onboarding-mode');
 
     mainContent.innerHTML = `
-
+        <div class="main-app">
+            <h1>Добро пожаловать!</h1>
+            <p>Ваш профиль загружен</p>
+            <button onclick="editProfile()">Редактировать профиль</button>
+        </div>
     `;
 }
 
@@ -645,8 +717,14 @@ async function completeOnboarding() {
     });
     
     try {
+        const userId = await getCurrentUser();
+        if (!userId) {
+            alert('Ошибка: пользователь не авторизован');
+            return;
+        }
+        
         const profileData = {
-            id: await getCurrentUser(),
+            id: userId,
             age: parseInt(userBasicInfo.age),
             city: userBasicInfo.city,
             career_type: selectedOnboardingItems.career[0] || '',
@@ -670,23 +748,20 @@ async function completeOnboarding() {
         });
         
         if (response.ok) {
-            console.log(response)
             const result = await response.json();
             console.log('Успешный ответ сервера:', result);
-            //alert('Профиль успешно сохранен! 🎉');
-            //setTimeout(() => {
-            //    location.reload();
-            //}, 1500);
+            alert('Профиль успешно сохранен! 🎉');
+            setTimeout(() => {
+                location.reload();
+            }, 1500);
         } else {
-            //const errorText = await response.text();
-            //console.error('Ошибка сервера:', response.status, errorText);
-            //throw new Error(`Ошибка сервера: ${response.status} - ${errorText}`);
-            location.reload()
+            const errorText = await response.text();
+            console.error('Ошибка сервера:', response.status, errorText);
+            throw new Error(`Ошибка сервера: ${response.status} - ${errorText}`);
         }
     } catch (error) {
-        //console.error('Ошибка при сохранении профиля:', error);
-        //alert('Ошибка при сохранении профиля. Попробуйте еще раз.');
-        location.reload()
+        console.error('Ошибка при сохранении профиля:', error);
+        alert('Ошибка при сохранении профиля. Попробуйте еще раз.');
     }
 }
 
@@ -697,14 +772,25 @@ function editProfile() {
 
 async function initApp() {
     console.log('Инициализация приложения...');
-    const authStatus = await checkUserAuthorization();
-    console.log('Статус авторизации:', authStatus);
     
-    if (authStatus.authorized) {
-        loadMainContent(authStatus.userData);
-    } else {
+    try {
+        // Ждем загрузки WebApp
+        await waitForWebApp();
+        
+        const authStatus = await checkUserAuthorization();
+        console.log('Статус авторизации:', authStatus);
+        
+        if (authStatus.authorized && isProfileComplete(authStatus.userData)) {
+            loadMainContent(authStatus.userData);
+        } else {
+            loadOnboarding();
+        }
+    } catch (error) {
+        console.error('Ошибка инициализации:', error);
+        // Если WebApp не загрузился, все равно показываем онбординг
         loadOnboarding();
     }
 }
 
+// Запускаем приложение после загрузки DOM
 document.addEventListener('DOMContentLoaded', initApp);
