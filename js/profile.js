@@ -138,7 +138,7 @@ const API_BASE_URL = 'http://localhost:8080/profile?id=';
 
 async function fetchUserProfile() {
     try {
-        const response = await fetch(API_BASE_URL + getCurrentUser(), {
+        const response = await fetch(API_BASE_URL + await getCurrentUser(), {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json'
@@ -160,7 +160,7 @@ async function fetchUserProfile() {
 
 async function updateUserProfile(profileData) {
     try {
-        const response = await fetch(`http://localhost:8080/updateuser?id=`+getCurrentUser(), {
+        const response = await fetch(`http://localhost:8080/updateuser?id=`+await getCurrentUser(), {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'

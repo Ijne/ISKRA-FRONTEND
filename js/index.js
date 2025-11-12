@@ -112,7 +112,7 @@ let userBasicInfo = {
 };
 
 async function checkUserAuthorization() {
-    const userId = getCurrentUser();
+    const userId = await getCurrentUser();
     console.log('Проверка пользователя:', userId);
     
     try {

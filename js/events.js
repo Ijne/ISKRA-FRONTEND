@@ -190,7 +190,7 @@ async function openFlamesModal(eventId) {
         
         if (data.status === 'ok') {
             currentFlames = data.flames || [];
-            displayFlames(currentFlames);
+            await displayFlames(currentFlames);
             document.getElementById('flamesModal').style.display = 'flex';
         } else {
             throw new Error(data.error || 'Неизвестная ошибка');
@@ -209,9 +209,9 @@ function closeFlamesModal() {
 }
 
 
-function displayFlames(flames) {
+async function displayFlames(flames) {
     const flamesList = document.getElementById('flamesList');
-    const currentUserId = getCurrentUser();
+    const currentUserId = await getCurrentUser();
     
     if (!flames || flames.length === 0) {
         flamesList.innerHTML = `
