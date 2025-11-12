@@ -4,7 +4,7 @@ async function getCurrentUser() {
     try {
         if (!initData) {
             console.error('No init data found');
-            1;
+            return 1;
         }
 
         console.log('Raw initData:', initData);
