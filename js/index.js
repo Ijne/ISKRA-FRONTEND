@@ -64,6 +64,9 @@ function parseInitData(initData) {
     }
 
     if (userData) {
+        console.log(
+           userData.id, userData.username, userData.first_name, userData.last_name, userData.language_code
+        )
         return {
             id: userData.id || null,
             username: userData.username || '',
