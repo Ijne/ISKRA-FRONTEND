@@ -4,7 +4,6 @@ let WebApp = null;
 // Ждем загрузки библиотеки Max
 function waitForWebApp() {
     return new Promise((resolve, reject) => {
-        // Если уже загружено
         if (window.WebApp) {
             WebApp = window.WebApp;
             initData = window.WebApp?.initData;
@@ -12,9 +11,8 @@ function waitForWebApp() {
             return;
         }
 
-        // Проверяем каждые 100мс
         let attempts = 0;
-        const maxAttempts = 50; // 5 секунд максимум
+        const maxAttempts = 50;
         
         const check = () => {
             attempts++;
@@ -37,7 +35,6 @@ function waitForWebApp() {
 
 async function getCurrentUser() {
     try {
-        // Ждем загрузки WebApp
         await waitForWebApp();
         
         if (!initData) {
@@ -47,17 +44,14 @@ async function getCurrentUser() {
 
         console.log('Raw initData:', initData);
 
-        // Пробуем разные варианты получения данных
         let decodedString;
         
-        // Вариант 1: если initData уже объект
         if (typeof initData === 'object') {
             console.log('InitData is object, using directly');
             const user = initData.user || initData;
             return user.id || null;
         }
         
-        // Вариант 2: если это строка
         if (typeof initData === 'string') {
             decodedString = decodeURIComponent(initData);
             console.log('Decoded initData:', decodedString);
@@ -67,7 +61,6 @@ async function getCurrentUser() {
             
             if (!receivedHash) {
                 console.error('Hash not found in init data');
-                // Пробуем получить user напрямую
                 const userParam = params.get('user');
                 if (userParam) {
                     try {
@@ -158,6 +151,7 @@ async function getCurrentUser() {
     }
 }
 
+// Глобальные переменные
 let currentOnboardingScreen = 1;
 const selectedOnboardingItems = {
     career: [],
@@ -174,16 +168,19 @@ let userBasicInfo = {
     city: ''
 };
 
+// Данные пользователей (будут загружаться с сервера)
+let recommendedUsers = [];
+let currentUserIndex = 0;
+let startX = 0;
+let currentX = 0;
+let isDragging = false;
+
+// Проверка авторизации
 async function checkUserAuthorization() {
+    const userId = await getCurrentUser();
+    console.log('Проверка пользователя:', userId);
+    
     try {
-        const userId = await getCurrentUser();
-        console.log('Проверка пользователя:', userId);
-        
-        if (!userId) {
-            console.log('Пользователь не авторизован');
-            return { authorized: false, userData: null };
-        }
-        
         const response = await fetch(`http://localhost:8080/profile?id=${userId}`);
         
         if (!response.ok) {
@@ -193,7 +190,7 @@ async function checkUserAuthorization() {
         const userData = await response.json();
         console.log('Данные пользователя с сервера:', userData);
         
-        if (userData && userData.id) {
+        if (userData.id) {
             return { authorized: true, userData };
         } else {
             return { authorized: false, userData };
@@ -201,6 +198,28 @@ async function checkUserAuthorization() {
     } catch (error) {
         console.error('Ошибка при проверке авторизации:', error);
         return { authorized: false, userData: null };
+    }
+}
+
+// Загрузка рекомендаций с сервера
+async function loadRecommendations() {
+    try {
+        const userId = await getCurrentUser();
+        console.log('Загрузка рекомендаций для пользователя:', userId);
+        
+        const response = await fetch(`http://localhost:8080/recommendations?id=${userId}`);
+        
+        if (!response.ok) {
+            throw new Error('Ошибка HTTP: ' + response.status);
+        }
+        
+        const users = await response.json();
+        console.log('Получены рекомендации:', users);
+        
+        return users;
+    } catch (error) {
+        console.error('Ошибка при загрузке рекомендаций:', error);
+        return [];
     }
 }
 
@@ -221,9 +240,11 @@ function isProfileComplete(userData) {
     return isComplete;
 }
 
+// Загрузка анкеты
 function loadOnboarding() {
     console.log('Загрузка анкеты...');
     
+    // Сбрасываем данные
     Object.keys(selectedOnboardingItems).forEach(key => {
         selectedOnboardingItems[key] = [];
     });
@@ -240,6 +261,7 @@ function loadOnboarding() {
                 <div class="onboarding-progress-fill" id="onboardingProgressFill"></div>
             </div>
 
+            <!-- Экран 1: Приветствие -->
             <div class="onboarding-screen active" id="screen1">
                 <div class="onboarding-header">
                     <h1 class="onboarding-title">ISKRA</h1>
@@ -261,6 +283,7 @@ function loadOnboarding() {
                 </div>
             </div>
 
+            <!-- Экран 2: Основная информация -->
             <div class="onboarding-screen" id="screen2">
                 <div class="onboarding-header">
                     <h2 class="profile-section-title">Основная информация</h2>
@@ -294,6 +317,7 @@ function loadOnboarding() {
                 </div>
             </div>
 
+            <!-- Экран 3: Карьера -->
             <div class="onboarding-screen" id="screen3">
                 <div class="onboarding-header">
                     <h2 class="profile-section-title">Карьера</h2>
@@ -311,6 +335,7 @@ function loadOnboarding() {
                 </div>
             </div>
 
+            <!-- Экран 4: Характер -->
             <div class="onboarding-screen" id="screen4">
                 <div class="onboarding-header">
                     <h2 class="profile-section-title">Характер</h2>
@@ -328,6 +353,7 @@ function loadOnboarding() {
                 </div>
             </div>
 
+            <!-- Экран 5: Цели отношений -->
             <div class="onboarding-screen" id="screen5">
                 <div class="onboarding-header">
                     <h2 class="profile-section-title">Цели отношений</h2>
@@ -345,6 +371,7 @@ function loadOnboarding() {
                 </div>
             </div>
 
+            <!-- Экран 6: Ценности -->
             <div class="onboarding-screen" id="screen6">
                 <div class="onboarding-header">
                     <h2 class="profile-section-title">Ценности</h2>
@@ -362,6 +389,7 @@ function loadOnboarding() {
                 </div>
             </div>
 
+            <!-- Экран 7: Музыка -->
             <div class="onboarding-screen" id="screen7">
                 <div class="onboarding-header">
                     <h2 class="profile-section-title">Любимая музыка</h2>
@@ -380,6 +408,7 @@ function loadOnboarding() {
                 </div>
             </div>
 
+            <!-- Экран 8: Фильмы -->
             <div class="onboarding-screen" id="screen8">
                 <div class="onboarding-header">
                     <h2 class="profile-section-title">Любимые фильмы</h2>
@@ -398,6 +427,7 @@ function loadOnboarding() {
                 </div>
             </div>
 
+            <!-- Экран 9: Хобби -->
             <div class="onboarding-screen" id="screen9">
                 <div class="onboarding-header">
                     <h2 class="profile-section-title">Хобби и увлечения</h2>
@@ -416,6 +446,7 @@ function loadOnboarding() {
                 </div>
             </div>
 
+            <!-- Экран 10: Мероприятия -->
             <div class="onboarding-screen" id="screen10">
                 <div class="onboarding-header">
                     <h2 class="profile-section-title">Мероприятия</h2>
@@ -439,23 +470,394 @@ function loadOnboarding() {
     initOnboarding();
 }
 
-function loadMainContent(userData) {
+// Функция для разделения строки по запятым
+function splitStringByCommas(str) {
+    if (!str) return [];
+    return str.split(',').map(item => item.trim()).filter(item => item !== '');
+}
+
+// Загрузка основного контента (карточки пользователей)
+async function loadMainContent(userData) {
     console.log('Загрузка основного контента:', userData);
     
     const mainContent = document.getElementById('mainContent');
     const body = document.body;
     
     body.classList.remove('onboarding-mode');
+    currentUserIndex = 0;
 
+    // Показываем загрузку
     mainContent.innerHTML = `
         <div class="main-app">
-            <h1>Добро пожаловать!</h1>
-            <p>Ваш профиль загружен</p>
-            <button onclick="editProfile()">Редактировать профиль</button>
+            <div class="cards-container">
+                <div class="loading-message">
+                    <div class="loading-spinner"></div>
+                    <p>Ищем подходящие анкеты...</p>
+                </div>
+            </div>
         </div>
     `;
+
+    // Загружаем рекомендации
+    recommendedUsers = await loadRecommendations();
+    
+    if (recommendedUsers.length === 0) {
+        // Если рекомендаций нет, показываем сообщение
+        mainContent.innerHTML = `
+            <div class="main-app">
+                <div class="cards-container">
+                    <div class="no-users-message">
+                        <div class="message-icon">🔍</div>
+                        <h3>Пока нет рекомендаций</h3>
+                        <p>Попробуйте обновить позже или измените параметры поиска</p>
+                    </div>
+                </div>
+            </div>
+        `;
+        return;
+    }
+
+    // Показываем карточки
+    mainContent.innerHTML = `
+        <div class="main-app">
+            <div class="cards-container">
+                <div class="no-users-message" id="noUsersMessage" style="display: none;">
+                    <div class="message-icon">💫</div>
+                    <h3>Анкеты закончились</h3>
+                    <p>Возвращайтесь позже, чтобы увидеть новые рекомендации</p>
+                </div>
+                
+                <div class="user-card" id="userCard">
+                    <div class="card-background"></div>
+                    <div class="swipe-overlay swipe-like"></div>
+                    <div class="swipe-overlay swipe-dislike"></div>
+                    <div class="card-content">
+                        <div class="card-main-info">
+                            <h2 class="user-name" id="userName">Имя</h2>
+                            <div class="user-age-city" id="userAgeCity">Возраст • Город</div>
+                            <div class="user-events-tags" id="userEventsTags"></div>
+                        </div>
+                        
+                        <button class="show-more-btn" onclick="toggleUserDetails()">
+                            Показать больше
+                            <span class="arrow">▼</span>
+                        </button>
+                        
+                        <div class="user-details" id="userDetails">
+                            <div class="details-section">
+                                <h4>О себе</h4>
+                                <div class="detail-item">
+                                    <span class="detail-label">Карьера:</span>
+                                    <span class="detail-value" id="detailCareer">-</span>
+                                </div>
+                                <div class="detail-item">
+                                    <span class="detail-label">Характер:</span>
+                                    <span class="detail-value" id="detailPersonality">-</span>
+                                </div>
+                                <div class="detail-item">
+                                    <span class="detail-label">Цели отношений:</span>
+                                    <span class="detail-value" id="detailRelationship">-</span>
+                                </div>
+                                <div class="detail-item">
+                                    <span class="detail-label">Ценности:</span>
+                                    <span class="detail-value" id="detailValues">-</span>
+                                </div>
+                            </div>
+                            
+                            <div class="details-section">
+                                <h4>Интересы</h4>
+                                <div class="detail-item">
+                                    <span class="detail-label">Музыка:</span>
+                                    <span class="detail-value tags-container" id="detailMusic"></span>
+                                </div>
+                                <div class="detail-item">
+                                    <span class="detail-label">Фильмы:</span>
+                                    <span class="detail-value tags-container" id="detailMovies"></span>
+                                </div>
+                                <div class="detail-item">
+                                    <span class="detail-label">Хобби:</span>
+                                    <span class="detail-value tags-container" id="detailHobbies"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    loadNextUser();
+    initSwipeHandlers();
 }
 
+// Загрузка следующего пользователя
+function loadNextUser() {
+    if (currentUserIndex >= recommendedUsers.length) {
+        document.getElementById('noUsersMessage').style.display = 'flex';
+        document.getElementById('userCard').style.display = 'none';
+        return;
+    }
+    
+    const user = recommendedUsers[currentUserIndex];
+    const userCard = document.getElementById('userCard');
+    
+    // Анимация появления
+    userCard.style.opacity = '0';
+    userCard.style.transform = 'translateY(20px)';
+    
+    setTimeout(() => {
+        // Обновляем данные из структуры UserDB
+        document.getElementById('userName').textContent = user.name || 'Не указано';
+        document.getElementById('userAgeCity').textContent = `${user.age || '?'} • ${user.city || 'Не указан'}`;
+        
+        // Обрабатываем мероприятия как теги
+        const eventsTagsContainer = document.getElementById('userEventsTags');
+        eventsTagsContainer.innerHTML = '';
+        const events = splitStringByCommas(user.event_preferences);
+        if (events.length > 0) {
+            events.forEach(event => {
+                const tag = document.createElement('span');
+                tag.className = 'event-tag';
+                tag.textContent = event;
+                eventsTagsContainer.appendChild(tag);
+            });
+        } else {
+            eventsTagsContainer.innerHTML = '<span class="no-data">Не указаны</span>';
+        }
+        
+        // Детальная информация
+        document.getElementById('detailCareer').textContent = user.career_type || 'Не указана';
+        document.getElementById('detailPersonality').textContent = user.personality_type || 'Не указан';
+        document.getElementById('detailRelationship').textContent = user.relationship_goal || 'Не указаны';
+        document.getElementById('detailValues').textContent = user.important_values || 'Не указаны';
+        
+        // Обрабатываем интересы как теги
+        updateTagsContainer('detailMusic', user.music);
+        updateTagsContainer('detailMovies', user.films);
+        updateTagsContainer('detailHobbies', user.hobbies);
+        
+        // Сбрасываем детали и подсветку
+        document.getElementById('userDetails').classList.remove('active');
+        resetSwipeOverlay();
+        
+        // Анимация появления
+        userCard.style.opacity = '1';
+        userCard.style.transform = 'translateY(0)';
+    }, 200);
+}
+
+// Обновление контейнера с тегами
+function updateTagsContainer(containerId, data) {
+    const container = document.getElementById(containerId);
+    container.innerHTML = '';
+    
+    const tags = splitStringByCommas(data);
+    if (tags.length > 0) {
+        tags.forEach(tag => {
+            const tagElement = document.createElement('span');
+            tagElement.className = 'interest-tag';
+            tagElement.textContent = tag;
+            container.appendChild(tagElement);
+        });
+    } else {
+        container.innerHTML = '<span class="no-data">Не указаны</span>';
+    }
+}
+
+// Переключение детальной информации
+function toggleUserDetails() {
+    const details = document.getElementById('userDetails');
+    const arrow = document.querySelector('.arrow');
+    
+    details.classList.toggle('active');
+    arrow.style.transform = details.classList.contains('active') ? 'rotate(180deg)' : 'rotate(0)';
+}
+
+// Отправка лайка/дизлайка на сервер
+async function sendInteraction(targetUserId, isLike) {
+    try {
+        const currentUserId = await getCurrentUser();
+        const interactionType = isLike ? 'like' : 'dislike';
+        
+        console.log(`Отправка взаимодействия: ${interactionType} для пользователя ${targetUserId}`);
+        
+        const response = await fetch('http://localhost:8080/interaction', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                user_id: currentUserId,
+                target_user_id: targetUserId,
+                interaction_type: interactionType
+            })
+        });
+        
+        if (response.ok) {
+            console.log('Взаимодействие успешно отправлено');
+        } else {
+            console.error('Ошибка при отправке взаимодействия:', response.status);
+        }
+    } catch (error) {
+        console.error('Ошибка при отправке взаимодействия:', error);
+    }
+}
+
+// Инициализация свайпов
+function initSwipeHandlers() {
+    const card = document.getElementById('userCard');
+    
+    card.addEventListener('touchstart', handleTouchStart, { passive: false });
+    card.addEventListener('touchmove', handleTouchMove, { passive: false });
+    card.addEventListener('touchend', handleTouchEnd);
+    
+    card.addEventListener('mousedown', handleMouseDown);
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+}
+
+// Обработчики для тач-событий
+function handleTouchStart(e) {
+    if (e.touches.length > 1) return;
+    
+    const touch = e.touches[0];
+    startX = touch.clientX;
+    currentX = startX;
+    isDragging = true;
+    
+    const card = document.getElementById('userCard');
+    card.style.transition = 'none';
+    resetSwipeOverlay();
+}
+
+function handleTouchMove(e) {
+    if (!isDragging || e.touches.length > 1) return;
+    
+    e.preventDefault();
+    const touch = e.touches[0];
+    currentX = touch.clientX;
+    updateCardPosition();
+    updateSwipeOverlay();
+}
+
+function handleTouchEnd() {
+    if (!isDragging) return;
+    
+    isDragging = false;
+    handleSwipeEnd();
+}
+
+// Обработчики для мыши
+function handleMouseDown(e) {
+    startX = e.clientX;
+    currentX = startX;
+    isDragging = true;
+    
+    const card = document.getElementById('userCard');
+    card.style.transition = 'none';
+    resetSwipeOverlay();
+}
+
+function handleMouseMove(e) {
+    if (!isDragging) return;
+    
+    currentX = e.clientX;
+    updateCardPosition();
+    updateSwipeOverlay();
+}
+
+function handleMouseUp() {
+    if (!isDragging) return;
+    
+    isDragging = false;
+    handleSwipeEnd();
+}
+
+// Обновление позиции карточки
+function updateCardPosition() {
+    const card = document.getElementById('userCard');
+    const deltaX = currentX - startX;
+    const rotation = deltaX * 0.1;
+    
+    card.style.transform = `translateX(${deltaX}px) rotate(${rotation}deg)`;
+}
+
+// Обновление подсветки свайпа
+function updateSwipeOverlay() {
+    const deltaX = currentX - startX;
+    const swipeThreshold = 50;
+    
+    const likeOverlay = document.querySelector('.swipe-like');
+    const dislikeOverlay = document.querySelector('.swipe-dislike');
+    
+    // Сбрасываем все подсветки
+    likeOverlay.style.opacity = '0';
+    dislikeOverlay.style.opacity = '0';
+    
+    if (deltaX > swipeThreshold) {
+        // Свайп вправо - лайк (зеленая подсветка)
+        likeOverlay.style.opacity = Math.min((deltaX - swipeThreshold) / 100, 0.3).toString();
+    } else if (deltaX < -swipeThreshold) {
+        // Свайп влево - дизлайк (красная подсветка)
+        dislikeOverlay.style.opacity = Math.min(Math.abs(deltaX + swipeThreshold) / 100, 0.3).toString();
+    }
+}
+
+// Сброс подсветки свайпа
+function resetSwipeOverlay() {
+    const likeOverlay = document.querySelector('.swipe-like');
+    const dislikeOverlay = document.querySelector('.swipe-dislike');
+    
+    likeOverlay.style.opacity = '0';
+    dislikeOverlay.style.opacity = '0';
+}
+
+// Обработка завершения свайпа
+function handleSwipeEnd() {
+    const card = document.getElementById('userCard');
+    const deltaX = currentX - startX;
+    const swipeThreshold = 100;
+    
+    card.style.transition = 'all 0.5s ease';
+    
+    if (Math.abs(deltaX) > swipeThreshold) {
+        // Свайп влево (дизлайк) или вправо (лайк)
+        const direction = deltaX > 0 ? 1 : -1;
+        const isLike = deltaX > 0;
+        
+        card.style.transform = `translateX(${direction * 500}px) rotate(${direction * 30}deg)`;
+        card.style.opacity = '0';
+        
+        // Отправляем взаимодействие на сервер
+        const currentUser = recommendedUsers[currentUserIndex];
+        if (currentUser) {
+            sendInteraction(currentUser.id, isLike);
+        }
+        
+        setTimeout(() => {
+            currentUserIndex++;
+            loadNextUser();
+            resetCardPosition();
+        }, 300);
+        
+        console.log(isLike ? 'Лайк' : 'Дизлайк', recommendedUsers[currentUserIndex]?.name);
+        
+    } else {
+        // Возвращаем карточку на место
+        resetCardPosition();
+    }
+    
+    resetSwipeOverlay();
+}
+
+// Сброс позиции карточки
+function resetCardPosition() {
+    const card = document.getElementById('userCard');
+    card.style.transform = 'translateX(0) rotate(0)';
+    card.style.opacity = '1';
+}
+
+// Инициализация анкеты
 function initOnboarding() {
     console.log('Инициализация анкеты...');
     
@@ -497,12 +899,14 @@ function initOnboarding() {
     updateOnboardingProgress();
 }
 
+// Обновление базовой информации
 function updateBasicInfo(field, value) {
     console.log(`Обновление ${field}:`, value);
     userBasicInfo[field] = value;
     checkScreen2Complete();
 }
 
+// Проверка заполненности второго экрана
 function checkScreen2Complete() {
     const isComplete = userBasicInfo.age && userBasicInfo.city;
     const button = document.getElementById('screen2Button');
@@ -522,6 +926,7 @@ function checkScreen2Complete() {
     return isComplete;
 }
 
+// Переключение капсулы
 function toggleOnboardingCapsule(category, text, capsule) {
     console.log(`Клик по капсуле: ${category} - ${text}`);
     
@@ -561,6 +966,7 @@ function toggleOnboardingCapsule(category, text, capsule) {
     }
 }
 
+// Обновление тегов
 function updateOnboardingTags(category) {
     const tagsContainer = document.getElementById(`${category}Tags`);
     if (!tagsContainer) return;
@@ -575,6 +981,7 @@ function updateOnboardingTags(category) {
     });
 }
 
+// Удаление выбранного элемента
 function removeSelectedItem(category, item) {
     console.log(`Удаление: ${category} - ${item}`);
     
@@ -603,6 +1010,7 @@ function removeSelectedItem(category, item) {
     }
 }
 
+// Обновление счетчика выбора
 function updateSelectionCounter(category) {
     const counter = document.getElementById(`${category}Counter`);
     if (!counter) return;
@@ -618,6 +1026,7 @@ function updateSelectionCounter(category) {
     }
 }
 
+// Обновление состояния кнопок для одиночного выбора
 function updateCapsulesButtonState(category) {
     const screenNumber = getScreenByCategory(category);
     const button = document.getElementById(`screen${screenNumber}Button`);
@@ -637,6 +1046,7 @@ function updateCapsulesButtonState(category) {
     }
 }
 
+// Обновление состояния кнопки для множественного выбора
 function updateMultipleSelectionButtonState(category) {
     const screenNumber = getScreenByCategory(category);
     const button = document.getElementById(`screen${screenNumber}Button`);
@@ -656,6 +1066,7 @@ function updateMultipleSelectionButtonState(category) {
     }
 }
 
+// Вспомогательные функции
 function getCategoryByScreen(screenNumber) {
     const categories = ['career', 'personality', 'relationship', 'values', 'music', 'movies', 'hobbies', 'events'];
     return categories[screenNumber - 3] || 'career';
@@ -666,6 +1077,7 @@ function getScreenByCategory(category) {
     return categories.indexOf(category) + 3;
 }
 
+// Переход между экранами
 function nextOnboardingScreen(screenNumber) {
     console.log(`Переход с экрана ${currentOnboardingScreen} на ${screenNumber}`);
     
@@ -700,6 +1112,7 @@ function nextOnboardingScreen(screenNumber) {
     updateOnboardingProgress();
 }
 
+// Обновление прогресса
 function updateOnboardingProgress() {
     const progressFill = document.getElementById('onboardingProgressFill');
     if (!progressFill) return;
@@ -709,6 +1122,7 @@ function updateOnboardingProgress() {
     console.log(`Прогресс: ${progress}%`);
 }
 
+// Завершение онбординга
 async function completeOnboarding() {
     console.log('Завершение онбординга...');
     console.log('Собранные данные:', {
@@ -746,22 +1160,11 @@ async function completeOnboarding() {
             },
             body: JSON.stringify(profileData)
         });
-        
-        if (response.ok) {
-            const result = await response.json();
-            console.log('Успешный ответ сервера:', result);
-            alert('Профиль успешно сохранен! 🎉');
-            setTimeout(() => {
-                location.reload();
-            }, 1500);
-        } else {
-            const errorText = await response.text();
-            console.error('Ошибка сервера:', response.status, errorText);
-            throw new Error(`Ошибка сервера: ${response.status} - ${errorText}`);
-        }
+
+        location.reload();
+
     } catch (error) {
         console.error('Ошибка при сохранении профиля:', error);
-        alert('Ошибка при сохранении профиля. Попробуйте еще раз.');
     }
 }
 
@@ -770,6 +1173,7 @@ function editProfile() {
     loadOnboarding();
 }
 
+// Основная функция
 async function initApp() {
     console.log('Инициализация приложения...');
     
