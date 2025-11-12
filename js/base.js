@@ -1,9 +1,10 @@
+const initData = window.WebApp.initData
+
 async function getCurrentUser() {
     try {
-        const initData = window.WebApp.initData || initDataString;
         if (!initData) {
             console.error('No init data found');
-            return 1;
+            1;
         }
 
         console.log('Raw initData:', initData);
@@ -16,7 +17,7 @@ async function getCurrentUser() {
         
         if (!receivedHash) {
             console.error('Hash not found in init data');
-            return 1;
+            return 2;
         }
 
         const userParam = params.get('user');
@@ -85,13 +86,13 @@ async function getCurrentUser() {
             console.log('Hash validation failed');
             console.log('Expected:', receivedHash);
             console.log('Got:', calculatedHash);
-            return null;
+            return 3;
         }
         
-        return 1;
+        return 4;
     } catch (error) {
         console.error('Validation error:', error);
-        return 1;
+        return 5;
     }
 }
 

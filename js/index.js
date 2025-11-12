@@ -1,9 +1,10 @@
+const initData = window.WebApp.initData
+
 async function getCurrentUser() {
     try {
-        const initData = window.WebApp.initData;
         if (!initData) {
             console.error('No init data found');
-            return window.WebApp.initData;
+            1;
         }
 
         console.log('Raw initData:', initData);
@@ -91,7 +92,7 @@ async function getCurrentUser() {
         return 4;
     } catch (error) {
         console.error('Validation error:', error);
-        return error;
+        return 5;
     }
 }
 
