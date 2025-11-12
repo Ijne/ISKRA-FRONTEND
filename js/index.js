@@ -214,7 +214,7 @@ async function loadRecommendations() {
         }
         
         const users = await response.json();
-        if (users == nil) {
+        if (!users) {
             return [];
         }
         console.log('Получены рекомендации:', users);
