@@ -486,22 +486,6 @@ async function loadMainContent(userData) {
 
     // Загружаем рекомендации
     recommendedUsers = await loadRecommendations();
-    
-    if (recommendedUsers.length === 0) {
-        // Если рекомендаций нет, показываем сообщение
-        mainContent.innerHTML = `
-            <div class="main-app">
-                <div class="cards-container">
-                    <div class="no-users-message">
-                        <div class="message-icon">🔍</div>
-                        <h3>Пока нет рекомендаций</h3>
-                        <p>Попробуйте обновить позже или измените параметры поиска</p>
-                    </div>
-                </div>
-            </div>
-        `;
-        return;
-    }
 
     // Показываем карточки
     mainContent.innerHTML = `
