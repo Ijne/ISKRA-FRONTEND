@@ -1,10 +1,10 @@
-const initData = window.WebApp.initData
+const initData = window.WebApp?.initData
 
 async function getCurrentUser() {
     try {
         if (!initData) {
             console.error('No init data found');
-            return 1;
+            return null;
         }
 
         console.log('Raw initData:', initData);
@@ -17,51 +17,48 @@ async function getCurrentUser() {
         
         if (!receivedHash) {
             console.error('Hash not found in init data');
-            return 2;
+            return null;
         }
 
         const userParam = params.get('user');
         
-        params.delete('hash');
-        
         const dataPairs = [];
         for (const [key, value] of params) {
-            dataPairs.push(`${key}=${value}`);
+            if (key !== 'hash') {
+                dataPairs.push(`${key}=${value}`);
+            }
         }
         dataPairs.sort();
         
         const dataCheckString = dataPairs.join('\n');
         console.log('Data check string:', dataCheckString);
-        console.log('Received hash:', receivedHash);
 
-        const encoder = new TextEncoder();
+        const botToken = 'f9LHodD0cOLRQi29OdyXpiSqLM-SyPUJnePMbZQH3ceilC7cKmf12ib4C7Oeda975ZN_gzuX6fJmQVKE5j1e';
         
-        const webAppKey = await crypto.subtle.importKey(
+        const encoder = new TextEncoder();
+
+        const secretKey = await crypto.subtle.importKey(
             'raw',
             encoder.encode('WebAppData'),
             { name: 'HMAC', hash: 'SHA-256' },
             false,
             ['sign']
         );
-        
-        const secretKey = await crypto.subtle.sign(
+
+        const cryptoKey = await crypto.subtle.sign(
             'HMAC',
-            webAppKey,
-            encoder.encode('f9LHodD0cOLRQi29OdyXpiSqLM-SyPUJnePMbZQH3ceilC7cKmf12ib4C7Oeda975ZN_gzuX6fJmQVKE5j1e')
+            secretKey,
+            encoder.encode(botToken)
         );
-        
-        console.log('Secret key (hex):', Array.from(new Uint8Array(secretKey))
-            .map(b => b.toString(16).padStart(2, '0'))
-            .join(''));
 
         const hmacKey = await crypto.subtle.importKey(
             'raw',
-            secretKey,
+            cryptoKey,
             { name: 'HMAC', hash: 'SHA-256' },
             false,
             ['sign']
         );
-        
+
         const signature = await crypto.subtle.sign(
             'HMAC',
             hmacKey,
@@ -73,26 +70,30 @@ async function getCurrentUser() {
             .join('');
         
         console.log('Calculated hash:', calculatedHash);
+        console.log('Received hash:', receivedHash);
 
         if (calculatedHash === receivedHash) {
             console.log('Hash validation successful');
             
             if (userParam) {
-                const userData = JSON.parse(userParam);
-                console.log('User data:', userData);
-                return userData.id || null;
+                try {
+                    const userData = JSON.parse(userParam);
+                    console.log('User data:', userData);
+                    return userData.id || null;
+                } catch (parseError) {
+                    console.error('Error parsing user data:', parseError);
+                    return null;
+                }
             }
         } else {
             console.log('Hash validation failed');
-            console.log('Expected:', receivedHash);
-            console.log('Got:', calculatedHash);
-            return 3;
+            return null;
         }
         
-        return 4;
+        return null;
     } catch (error) {
         console.error('Validation error:', error);
-        return 5;
+        return null;
     }
 }
 
