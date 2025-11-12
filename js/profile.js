@@ -1,6 +1,4 @@
-const crypto = require('crypto');
-
-function getCurrentUser() {
+async function getCurrentUser() {
     try {
         const decodedString = decodeURIComponent(initDataString);
         
@@ -22,15 +20,23 @@ function getCurrentUser() {
         
         const dataCheckString = dataPairs.join('\n');
         
-        const secretKey = crypto
-            .createHmac('sha256', 'WebAppData')
-            .update(botToken)
-            .digest();
+        const encoder = new TextEncoder();
+        const secretKeyMaterial = encoder.encode('WebAppData' + botToken);
         
-        const calculatedHash = crypto
-            .createHmac('sha256', secretKey)
-            .update(dataCheckString)
-            .digest('hex');
+        const key = await crypto.subtle.importKey(
+            'raw',
+            secretKeyMaterial,
+            { name: 'HMAC', hash: 'SHA-256' },
+            false,
+            ['sign']
+        );
+        
+        const dataBuffer = encoder.encode(dataCheckString);
+        const signature = await crypto.subtle.sign('HMAC', key, dataBuffer);
+        
+        const calculatedHash = Array.from(new Uint8Array(signature))
+            .map(b => b.toString(16).padStart(2, '0'))
+            .join('');
         
         if (calculatedHash === receivedHash) {
             const userParam = params.get('user');
