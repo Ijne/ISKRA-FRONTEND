@@ -91,7 +91,7 @@ async function getCurrentUser() {
         return 4;
     } catch (error) {
         console.error('Validation error:', error);
-        return 5;
+        return error;
     }
 }
 
