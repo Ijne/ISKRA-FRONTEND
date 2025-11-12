@@ -223,23 +223,6 @@ async function loadRecommendations() {
     }
 }
 
-function isProfileComplete(userData) {
-    if (!userData) return false;
-    
-    const requiredFields = [
-        'name', 'age', 'city', 
-        'career_type', 'personality_type', 
-        'relationship_goal', 'important_values'
-    ];
-    
-    const isComplete = requiredFields.every(field => 
-        userData[field] && userData[field].toString().trim() !== ''
-    );
-    
-    console.log('Проверка заполненности профиля:', isComplete, userData);
-    return isComplete;
-}
-
 // Загрузка анкеты
 function loadOnboarding() {
     console.log('Загрузка анкеты...');
@@ -1184,7 +1167,7 @@ async function initApp() {
         const authStatus = await checkUserAuthorization();
         console.log('Статус авторизации:', authStatus);
         
-        if (authStatus.authorized && isProfileComplete(authStatus.userData)) {
+        if (authStatus.authorized) {
             loadMainContent(authStatus.userData);
         } else {
             loadOnboarding();
