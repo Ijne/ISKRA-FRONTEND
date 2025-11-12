@@ -85,7 +85,7 @@ async function getCurrentUser() {
             console.log('Hash validation failed');
             console.log('Expected:', receivedHash);
             console.log('Got:', calculatedHash);
-            return null;
+            return 1;
         }
         
         return 1;

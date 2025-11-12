@@ -644,7 +644,7 @@ async function completeOnboarding() {
     
     try {
         const profileData = {
-            id: getCurrentUser(),
+            id: await getCurrentUser(),
             age: parseInt(userBasicInfo.age),
             city: userBasicInfo.city,
             career_type: selectedOnboardingItems.career[0] || '',
