@@ -1,10 +1,8 @@
 let initData = null;
 let WebApp = null;
 
-// Ждем загрузки библиотеки Max
 function waitForWebApp() {
     return new Promise((resolve, reject) => {
-        // Если уже загружено
         if (window.WebApp) {
             WebApp = window.WebApp;
             initData = window.WebApp?.initData;
@@ -12,9 +10,8 @@ function waitForWebApp() {
             return;
         }
 
-        // Проверяем каждые 100мс
         let attempts = 0;
-        const maxAttempts = 50; // 5 секунд максимум
+        const maxAttempts = 50;
         
         const check = () => {
             attempts++;
@@ -37,7 +34,6 @@ function waitForWebApp() {
 
 async function getCurrentUser() {
     try {
-        // Ждем загрузки WebApp
         await waitForWebApp();
         
         if (!initData) {
@@ -47,17 +43,14 @@ async function getCurrentUser() {
 
         console.log('Raw initData:', initData);
 
-        // Пробуем разные варианты получения данных
         let decodedString;
         
-        // Вариант 1: если initData уже объект
         if (typeof initData === 'object') {
             console.log('InitData is object, using directly');
             const user = initData.user || initData;
             return user.id || null;
         }
         
-        // Вариант 2: если это строка
         if (typeof initData === 'string') {
             decodedString = decodeURIComponent(initData);
             console.log('Decoded initData:', decodedString);
@@ -67,7 +60,6 @@ async function getCurrentUser() {
             
             if (!receivedHash) {
                 console.error('Hash not found in init data');
-                // Пробуем получить user напрямую
                 const userParam = params.get('user');
                 if (userParam) {
                     try {
@@ -774,7 +766,6 @@ async function initApp() {
     console.log('Инициализация приложения...');
     
     try {
-        // Ждем загрузки WebApp
         await waitForWebApp();
         
         const authStatus = await checkUserAuthorization();
@@ -787,10 +778,8 @@ async function initApp() {
         }
     } catch (error) {
         console.error('Ошибка инициализации:', error);
-        // Если WebApp не загрузился, все равно показываем онбординг
         loadOnboarding();
     }
 }
 
-// Запускаем приложение после загрузки DOM
 document.addEventListener('DOMContentLoaded', initApp);

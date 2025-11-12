@@ -1,7 +1,42 @@
-const initData = window.Window.WebApp?.initData
+let initData = null;
+let WebApp = null;
+
+function waitForWebApp() {
+    return new Promise((resolve, reject) => {
+        if (window.WebApp) {
+            WebApp = window.WebApp;
+            initData = window.WebApp?.initData;
+            resolve();
+            return;
+        }
+
+        let attempts = 0;
+        const maxAttempts = 50;
+        
+        const check = () => {
+            attempts++;
+            if (window.WebApp) {
+                WebApp = window.WebApp;
+                initData = window.WebApp?.initData;
+                console.log('WebApp загружен:', WebApp);
+                console.log('InitData:', initData);
+                resolve();
+            } else if (attempts < maxAttempts) {
+                setTimeout(check, 100);
+            } else {
+                console.warn('WebApp не загрузился, продолжаем без него');
+                resolve();
+            }
+        };
+        
+        check();
+    });
+}
 
 async function getCurrentUser() {
     try {
+        await waitForWebApp();
+        
         if (!initData) {
             console.error('No init data found');
             return null;
@@ -9,85 +44,104 @@ async function getCurrentUser() {
 
         console.log('Raw initData:', initData);
 
-        const decodedString = decodeURIComponent(initData);
-        console.log('Decoded initData:', decodedString);
-
-        const params = new URLSearchParams(decodedString);
-        const receivedHash = params.get('hash');
+        let decodedString;
         
-        if (!receivedHash) {
-            console.error('Hash not found in init data');
-            return null;
+        if (typeof initData === 'object') {
+            console.log('InitData is object, using directly');
+            const user = initData.user || initData;
+            return user.id || null;
         }
-
-        const userParam = params.get('user');
         
-        const dataPairs = [];
-        for (const [key, value] of params) {
-            if (key !== 'hash') {
-                dataPairs.push(`${key}=${value}`);
-            }
-        }
-        dataPairs.sort();
-        
-        const dataCheckString = dataPairs.join('\n');
-        console.log('Data check string:', dataCheckString);
+        if (typeof initData === 'string') {
+            decodedString = decodeURIComponent(initData);
+            console.log('Decoded initData:', decodedString);
 
-        const botToken = 'f9LHodD0cOLRQi29OdyXpiSqLM-SyPUJnePMbZQH3ceilC7cKmf12ib4C7Oeda975ZN_gzuX6fJmQVKE5j1e';
-        
-        const encoder = new TextEncoder();
-
-        const secretKey = await crypto.subtle.importKey(
-            'raw',
-            encoder.encode('WebAppData'),
-            { name: 'HMAC', hash: 'SHA-256' },
-            false,
-            ['sign']
-        );
-
-        const cryptoKey = await crypto.subtle.sign(
-            'HMAC',
-            secretKey,
-            encoder.encode(botToken)
-        );
-
-        const hmacKey = await crypto.subtle.importKey(
-            'raw',
-            cryptoKey,
-            { name: 'HMAC', hash: 'SHA-256' },
-            false,
-            ['sign']
-        );
-
-        const signature = await crypto.subtle.sign(
-            'HMAC',
-            hmacKey,
-            encoder.encode(dataCheckString)
-        );
-        
-        const calculatedHash = Array.from(new Uint8Array(signature))
-            .map(b => b.toString(16).padStart(2, '0'))
-            .join('');
-        
-        console.log('Calculated hash:', calculatedHash);
-        console.log('Received hash:', receivedHash);
-
-        if (calculatedHash === receivedHash) {
-            console.log('Hash validation successful');
+            const params = new URLSearchParams(decodedString);
+            const receivedHash = params.get('hash');
             
-            if (userParam) {
-                try {
-                    const userData = JSON.parse(userParam);
-                    console.log('User data:', userData);
-                    return userData.id || null;
-                } catch (parseError) {
-                    console.error('Error parsing user data:', parseError);
-                    return null;
+            if (!receivedHash) {
+                console.error('Hash not found in init data');
+                const userParam = params.get('user');
+                if (userParam) {
+                    try {
+                        const userData = JSON.parse(userParam);
+                        return userData.id || null;
+                    } catch (e) {
+                        console.error('Error parsing user data:', e);
+                    }
+                }
+                return null;
+            }
+
+            const userParam = params.get('user');
+            
+            const dataPairs = [];
+            for (const [key, value] of params) {
+                if (key !== 'hash') {
+                    dataPairs.push(`${key}=${value}`);
                 }
             }
-        } else {
-            console.log('Hash validation failed');
-            return null;
+            dataPairs.sort();
+            
+            const dataCheckString = dataPairs.join('\n');
+            console.log('Data check string:', dataCheckString);
+
+            const botToken = 'f9LHodD0cOLRQi29OdyXpiSqLM-SyPUJnePMbZQH3ceilC7cKmf12ib4C7Oeda975ZN_gzuX6fJmQVKE5j1e';
+            
+            const encoder = new TextEncoder();
+
+            const secretKey = await crypto.subtle.importKey(
+                'raw',
+                encoder.encode('WebAppData'),
+                { name: 'HMAC', hash: 'SHA-256' },
+                false,
+                ['sign']
+            );
+
+            const cryptoKey = await crypto.subtle.sign(
+                'HMAC',
+                secretKey,
+                encoder.encode(botToken)
+            );
+
+            const hmacKey = await crypto.subtle.importKey(
+                'raw',
+                cryptoKey,
+                { name: 'HMAC', hash: 'SHA-256' },
+                false,
+                ['sign']
+            );
+
+            const signature = await crypto.subtle.sign(
+                'HMAC',
+                hmacKey,
+                encoder.encode(dataCheckString)
+            );
+            
+            const calculatedHash = Array.from(new Uint8Array(signature))
+                .map(b => b.toString(16).padStart(2, '0'))
+                .join('');
+            
+            console.log('Calculated hash:', calculatedHash);
+            console.log('Received hash:', receivedHash);
+
+            if (calculatedHash === receivedHash) {
+                console.log('Hash validation successful');
+                
+                if (userParam) {
+                    try {
+                        const userData = JSON.parse(userParam);
+                        console.log('User data:', userData);
+                        return userData.id || null;
+                    } catch (parseError) {
+                        console.error('Error parsing user data:', parseError);
+                        return null;
+                    }
+                }
+            } else {
+                console.log('Hash validation failed');
+                return null;
+            }
         }
         
         return null;
@@ -98,17 +152,16 @@ async function getCurrentUser() {
 }
 
 const capsuleData = {
-        career: ['IT и технологии', 'Дизайн и UX', 'Медицина', 'Образование', 'Бизнес', 'Финансы', 'Маркетинг', 'Искусство', 'Музыка', 'Кино', 'Фотография', 'Архитектура', 'Инженерия', 'Недвижимость', 'Юриспруденция', 'Психология'],
-        personality: ['Экстраверт', 'Интроверт', 'Амбиверт', 'Аналитик', 'Творец', 'Прагматик', 'Романтик', 'Реалист', 'Оптимист', 'Философ', 'Новатор', 'Лидер', 'Целеустремленный', 'Гибкий', 'Настойчивый', 'Командный'],
-        relationship: ['Серьезные отношения', 'Дружба', 'Несерьезные отношения', 'Создание семьи', 'Поиск партнера', 'Романтика', 'Деловое партнерство', 'Творчество', 'Путешествия', 'Совместные проекты', 'Духовность', 'Карьера'],
-        values: ['Любовь и забота', 'Семья', 'Карьера', 'Финансы', 'Духовность', 'Здоровье', 'Образование', 'Творчество', 'Свобода', 'Приключения', 'Безопасность', 'Экология'],
-        music: ['Поп', 'Рок', 'Хип-хоп', 'Электроника', 'Джаз', 'Классика', 'R&B', 'Метал', 'Инди', 'Фолк', 'Кантри', 'Регги', 'Блюз', 'Соул', 'Диско', 'Альтернатива', 'Рэп'],
-        movies: ['Комедия', 'Драма', 'Боевик', 'Триллер', 'Ужасы', 'Фантастика', 'Фэнтези', 'Мелодрама', 'Детектив', 'Приключения', 'Аниме', 'Документальный', 'Артхаус', 'Исторический', 'Криминал', 'Мюзикл'],
-        hobbies: ['Спорт', 'Путешествия', 'Кулинария', 'Фотография', 'Рисование', 'Танцы', 'Йога', 'Велоспорт', 'Гейминг', 'Чтение', 'Садоводство', 'Рукоделие', 'Музыка', 'Театр', 'Кино', 'Настолки', 'Рыбалка', 'Охота', 'Авто', 'Технологии'],
-        events: ['Концерты', 'Кино', 'Выставки', 'Театры', 'Фестивали', 'Спортивные события', 'Вечеринки', 'Клубы', 'Рестораны', 'Кафе', 'Пикники', 'Походы', 'Мастер-классы', 'Лекции', 'Йога-сессии', 'Танцы', 'Настольные игры', 'Караоке', 'Боулинг', 'Картинг']
+    career: ['IT и технологии', 'Дизайн и UX', 'Медицина', 'Образование', 'Бизнес', 'Финансы', 'Маркетинг', 'Искусство', 'Музыка', 'Кино', 'Фотография', 'Архитектура', 'Инженерия', 'Недвижимость', 'Юриспруденция', 'Психология'],
+    personality: ['Экстраверт', 'Интроверт', 'Амбиверт', 'Аналитик', 'Творец', 'Прагматик', 'Романтик', 'Реалист', 'Оптимист', 'Философ', 'Новатор', 'Лидер', 'Целеустремленный', 'Гибкий', 'Настойчивый', 'Командный'],
+    relationship: ['Серьезные отношения', 'Дружба', 'Несерьезные отношения', 'Создание семьи', 'Поиск партнера', 'Романтика', 'Деловое партнерство', 'Творчество', 'Путешествия', 'Совместные проекты', 'Духовность', 'Карьера'],
+    values: ['Любовь и забота', 'Семья', 'Карьера', 'Финансы', 'Духовность', 'Здоровье', 'Образование', 'Творчество', 'Свобода', 'Приключения', 'Безопасность', 'Экология'],
+    music: ['Поп', 'Рок', 'Хип-хоп', 'Электроника', 'Джаз', 'Классика', 'R&B', 'Метал', 'Инди', 'Фолк', 'Кантри', 'Регги', 'Блюз', 'Соул', 'Диско', 'Альтернатива', 'Рэп'],
+    movies: ['Комедия', 'Драма', 'Боевик', 'Триллер', 'Ужасы', 'Фантастика', 'Фэнтези', 'Мелодрама', 'Детектив', 'Приключения', 'Аниме', 'Документальный', 'Артхаус', 'Исторический', 'Криминал', 'Мюзикл'],
+    hobbies: ['Спорт', 'Путешествия', 'Кулинария', 'Фотография', 'Рисование', 'Танцы', 'Йога', 'Велоспорт', 'Гейминг', 'Чтение', 'Садоводство', 'Рукоделие', 'Музыка', 'Театр', 'Кино', 'Настолки', 'Рыбалка', 'Охота', 'Авто', 'Технологии'],
+    events: ['Концерты', 'Кино', 'Выставки', 'Театры', 'Фестивали', 'Спортивные события', 'Вечеринки', 'Клубы', 'Рестораны', 'Кафе', 'Пикники', 'Походы', 'Мастер-классы', 'Лекции', 'Йога-сессии', 'Танцы', 'Настольные игры', 'Караоке', 'Боулинг', 'Картинг']
 };
 
-// ABOBA
 let currentField = '';
 let currentUserId = null;
 const selectedItems = {
@@ -136,11 +189,17 @@ const maxSelections = {
     events: 3
 };
 
-const API_BASE_URL = 'http://localhost:8080/profile?id=';
+const API_BASE_URL = 'http://localhost:8080';
 
 async function fetchUserProfile() {
     try {
-        const response = await fetch(API_BASE_URL + await getCurrentUser(), {
+        const userId = await getCurrentUser();
+        if (!userId) {
+            console.error('No user ID available');
+            return null;
+        }
+
+        const response = await fetch(`${API_BASE_URL}/profile?id=${userId}`, {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json'
@@ -148,7 +207,7 @@ async function fetchUserProfile() {
         });
         
         if (!response.ok) {
-            throw new Error('Ошибка при загрузке профиля');
+            throw new Error(`HTTP error! status: ${response.status}`);
         }
         
         const userData = await response.json();
@@ -162,7 +221,12 @@ async function fetchUserProfile() {
 
 async function updateUserProfile(profileData) {
     try {
-        const response = await fetch(`http://localhost:8080/updateuser?id=`+await getCurrentUser(), {
+        const userId = await getCurrentUser();
+        if (!userId) {
+            throw new Error('No user ID available for update');
+        }
+
+        const response = await fetch(`${API_BASE_URL}/updateuser?id=${userId}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -171,7 +235,7 @@ async function updateUserProfile(profileData) {
         });
         
         if (!response.ok) {
-            throw new Error('Ошибка при обновлении профиля');
+            throw new Error(`HTTP error! status: ${response.status}`);
         }
         
         return await response.json();
@@ -182,7 +246,18 @@ async function updateUserProfile(profileData) {
 }
 
 function parseServerData(userData) {
-    const parseArray = (str) => str ? str.split(',').map(item => item.trim()).filter(item => item) : [];
+    if (!userData) return {
+        name: '',
+        surname: '',
+        age: '',
+        city: '',
+        careerPlace: ''
+    };
+
+    const parseArray = (str) => {
+        if (!str || str === 'null' || str === 'undefined') return [];
+        return str.split(',').map(item => item.trim()).filter(item => item && item !== 'null' && item !== 'undefined');
+    };
     
     selectedItems.career = parseArray(userData.career_type).slice(0, maxSelections.career);
     selectedItems.personality = parseArray(userData.personality_type).slice(0, maxSelections.personality);
@@ -193,8 +268,8 @@ function parseServerData(userData) {
     selectedItems.movies = parseArray(userData.films).slice(0, maxSelections.movies);
     selectedItems.events = parseArray(userData.event_preferences).slice(0, maxSelections.events);
 
-    userGender = userData.gender || 0;
-    preferredGender = userData.preferred_gender !== undefined ? userData.preferred_gender : 1;
+    userGender = userData.gender !== undefined ? parseInt(userData.gender) : 0;
+    preferredGender = userData.preferred_gender !== undefined ? parseInt(userData.preferred_gender) : 1;
     
     return {
         name: userData.name || '',
@@ -206,39 +281,49 @@ function parseServerData(userData) {
 }
 
 function prepareDataForServer(profileData) {
+    const userId = currentUserId || (async () => await getCurrentUser())();
+    
     return {
-        id: currentUserId,
-        name: profileData.name,
+        id: userId,
+        name: profileData.name || '',
         surname: profileData.surname || '',
         age: parseInt(profileData.age) || 0,
-        city: profileData.city,
+        city: profileData.city || '',
         gender: userGender,
         preferred_gender: preferredGender,
         career_place: profileData.careerPlace || '',
-        career_type: profileData.career.join(','),
-        personality_type: profileData.personality.join(','),
-        relationship_goal: profileData.relationship.join(','),
-        important_values: profileData.values.join(','),
-        music: profileData.music.join(','),
-        hobbies: profileData.hobbies.join(','),
-        films: profileData.movies.join(','),
-        event_preferences: profileData.events.join(',')
+        career_type: (profileData.career || []).join(','),
+        personality_type: (profileData.personality || []).join(','),
+        relationship_goal: (profileData.relationship || []).join(','),
+        important_values: (profileData.values || []).join(','),
+        music: (profileData.music || []).join(','),
+        hobbies: (profileData.hobbies || []).join(','),
+        films: (profileData.movies || []).join(','),
+        event_preferences: (profileData.events || []).join(',')
     };
 }
 
 async function loadProfileData() {
-    const userData = await fetchUserProfile();
-    if (userData) {
+    try {
+        const userData = await fetchUserProfile();
         const parsedData = parseServerData(userData);
 
-        document.getElementById('nameValue').textContent = parsedData.name;
-        document.getElementById('ageValue').textContent = parsedData.age ? parsedData.age + ' лет' : '';
-        document.getElementById('cityValue').textContent = parsedData.city;
+        updateUIElement('nameValue', parsedData.name);
+        updateUIElement('ageValue', parsedData.age ? parsedData.age + ' лет' : '');
+        updateUIElement('cityValue', parsedData.city);
 
         updateGenderDisplay();
         updatePreferredGenderDisplay();
-
         updateAllSelectedCapsules();
+    } catch (error) {
+        console.error('Ошибка загрузки данных профиля:', error);
+    }
+}
+
+function updateUIElement(elementId, value) {
+    const element = document.getElementById(elementId);
+    if (element) {
+        element.textContent = value;
     }
 }
 
@@ -290,7 +375,7 @@ function updateSelectedCapsulesForCategory(category) {
     capsules.forEach(capsule => {
         const capsuleText = capsule.textContent;
 
-        capsule.classList.remove('selected');
+        capsule.classList.remove('selected', 'disabled');
 
         if (selectedItems[category].includes(capsuleText)) {
             capsule.classList.add('selected');
@@ -299,14 +384,14 @@ function updateSelectedCapsulesForCategory(category) {
         if (selectedItems[category].length >= maxSelections[category] && 
             !selectedItems[category].includes(capsuleText)) {
             capsule.classList.add('disabled');
-        } else {
-            capsule.classList.remove('disabled');
         }
     });
 }
 
 function toggleExpand(gridId, button) {
     const grid = document.getElementById(gridId);
+    if (!grid) return;
+
     const isExpanded = grid.classList.contains('expanded');
     
     if (isExpanded) {
@@ -318,34 +403,42 @@ function toggleExpand(gridId, button) {
     }
 
     const icon = button.querySelector('.expand-icon');
-    icon.style.transform = isExpanded ? 'rotate(0deg)' : 'rotate(180deg)';
+    if (icon) {
+        icon.style.transform = isExpanded ? 'rotate(0deg)' : 'rotate(180deg)';
+    }
 }
 
-function initCapsules() {
-    Object.keys(capsuleData).forEach(category => {
-        const grid = document.getElementById(`${category}Grid`);
-        const tagsContainer = document.getElementById(`${category}Tags`);
+async function initCapsules() {
+    try {
+        await waitForWebApp();
         
-        if (!grid) {
-            console.error(`Element with id ${category}Grid not found`);
-            return;
-        }
-
-        const shuffledItems = [...capsuleData[category]].sort(() => Math.random() - 0.5);
-        
-        shuffledItems.forEach(item => {
-            const capsule = document.createElement('div');
-            capsule.className = 'capsule';
-            capsule.textContent = item;
+        Object.keys(capsuleData).forEach(category => {
+            const grid = document.getElementById(`${category}Grid`);
+            const tagsContainer = document.getElementById(`${category}Tags`);
             
-            capsule.addEventListener('click', () => toggleCapsule(category, item, capsule, tagsContainer));
-            grid.appendChild(capsule);
+            if (!grid) {
+                console.warn(`Element with id ${category}Grid not found`);
+                return;
+            }
+
+            const shuffledItems = [...capsuleData[category]].sort(() => Math.random() - 0.5);
+            
+            shuffledItems.forEach(item => {
+                const capsule = document.createElement('div');
+                capsule.className = 'capsule';
+                capsule.textContent = item;
+                
+                capsule.addEventListener('click', () => toggleCapsule(category, item, capsule, tagsContainer));
+                grid.appendChild(capsule);
+            });
         });
-    });
 
-    loadProfileData();
+        await loadProfileData();
+        makeFieldsReadonly();
 
-    makeFieldsReadonly();
+    } catch (error) {
+        console.error('Ошибка инициализации капсул:', error);
+    }
 }
 
 function makeFieldsReadonly() {
@@ -532,10 +625,9 @@ async function saveProfile() {
         
         await updateUserProfile(serverData);
         
-        //alert('Профиль успешно сохранен!');
+        console.log('Профиль успешно сохранен!');
     } catch (error) {
-        //console.error('Ошибка при сохранении профиля:', error);
-        //alert('Ошибка при сохранении профиля. Попробуйте еще раз.');
+        console.error('Ошибка при сохранении профиля:', error);
     }
 }
 
