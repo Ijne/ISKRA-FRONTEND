@@ -43,19 +43,15 @@ async function getCurrentUser() {
             return null;
         }
 
-        console.log('Raw initData:', initData);
-
         let decodedString;
         
         if (typeof initData === 'object') {
-            console.log('InitData is object, using directly');
             const user = initData.user || initData;
             return user.id || null;
         }
 
         if (typeof initData === 'string') {
             decodedString = decodeURIComponent(initData);
-            console.log('Decoded initData:', decodedString);
 
             const params = new URLSearchParams(decodedString);
             const receivedHash = params.get('hash');
@@ -85,7 +81,6 @@ async function getCurrentUser() {
             dataPairs.sort();
             
             const dataCheckString = dataPairs.join('\n');
-            console.log('Data check string:', dataCheckString);
 
             const botToken = 'f9LHodD0cOLRQi29OdyXpiSqLM-SyPUJnePMbZQH3ceilC7cKmf12ib4C7Oeda975ZN_gzuX6fJmQVKE5j1e';
             

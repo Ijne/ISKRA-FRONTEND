@@ -3,8 +3,6 @@ let WebApp = null;
 
 function waitForWebApp() {
     return new Promise((resolve, reject) => {
-        console.log(window.WebApp)
-
         if (window.WebApp) {
             WebApp = window.WebApp;
             initData = window.WebApp?.initData;
@@ -20,6 +18,8 @@ function waitForWebApp() {
             if (window.WebApp) {
                 WebApp = window.WebApp;
                 initData = window.WebApp?.initData;
+                console.log('WebApp загружен:', WebApp);
+                console.log('InitData:', initData);
                 resolve();
             } else if (attempts < maxAttempts) {
                 setTimeout(check, 100);
@@ -117,7 +117,10 @@ const selectedOnboardingItems = {
 };
 let userBasicInfo = {
     age: '',
-    city: ''
+    city: '',
+    gender: '',
+    preferredGender: '',
+    vkProfile: ''
 };
 
 let recommendedUsers = [];
@@ -178,7 +181,7 @@ function loadOnboarding() {
     Object.keys(selectedOnboardingItems).forEach(key => {
         selectedOnboardingItems[key] = [];
     });
-    userBasicInfo = { age: '', city: '' };
+    userBasicInfo = { age: '', city: '', gender: '', preferredGender: '', vkProfile: '' };
     
     const mainContent = document.getElementById('mainContent');
     const body = document.body;
@@ -224,7 +227,6 @@ function loadOnboarding() {
                 <div class="onboarding-progress-fill" id="onboardingProgressFill"></div>
             </div>
 
-            <!-- Экран 2: Основная информация -->
             <div class="onboarding-screen" id="screen2">
                 <div class="onboarding-header">
                     <h2 class="profile-section-title">Основная информация</h2>
@@ -236,21 +238,50 @@ function loadOnboarding() {
                         <div class="onboarding-input-compact">
                             <div class="onboarding-input-label">Возраст</div>
                             <input type="number" class="onboarding-input-field" id="ageInput" 
-                                   placeholder="Укажите возраст" min="18" max="100"
-                                   oninput="updateBasicInfo('age', this.value)">
+                                placeholder="Укажите возраст" min="18" max="100"
+                                oninput="updateBasicInfo('age', this.value)">
                             <span class="onboarding-input-edit">✎</span>
                         </div>
                         
                         <div class="onboarding-input-compact">
                             <div class="onboarding-input-label">Город</div>
                             <input type="text" class="onboarding-input-field" id="cityInput" 
-                                   placeholder="Укажите город"
-                                   oninput="updateBasicInfo('city', this.value)">
+                                placeholder="Укажите город"
+                                oninput="updateBasicInfo('city', this.value)">
+                            <span class="onboarding-input-edit">✎</span>
+                        </div>
+
+                        <div class="onboarding-input-compact select-input">
+                            <div class="onboarding-input-label">Ваш пол</div>
+                            <select class="onboarding-input-field" id="genderInput" onchange="updateBasicInfo('gender', this.value)">
+                                <option value="0">Не выбран</option>
+                                <option value="0">Мужской</option>
+                                <option value="1">Женский</option>
+                            </select>
+                            <span class="onboarding-input-arrow">▼</span>
+                        </div>
+
+                        <div class="onboarding-input-compact select-input">
+                            <div class="onboarding-input-label">Людей какого пола вы хотите найти</div>
+                            <select class="onboarding-input-field" id="preferredGenderInput" onchange="updateBasicInfo('preferredGender', this.value)">
+                                <option value="2">Не выбран</option>
+                                <option value="2">Не важно</option>
+                                <option value="1">Женский</option>
+                                <option value="0">Мужской</option>
+                            </select>
+                            <span class="onboarding-input-arrow">▼</span>
+                        </div>
+
+                        <div class="onboarding-input-compact full-width">
+                            <div class="onboarding-input-label">Ссылка на профиль ВК (необходима для дальнейшего знакомства с людьми)</div>
+                            <input type="text" class="onboarding-input-field" id="vkProfileInput" 
+                                placeholder="https://vk.com/username"
+                                oninput="updateBasicInfo('vkProfile', this.value)">
                             <span class="onboarding-input-edit">✎</span>
                         </div>
                     </div>
                     
-                    <div class="selection-required" id="screen2Message">Заполните возраст и город</div>
+                    <div class="selection-required" id="screen2Message">Заполните все обязательные поля</div>
                     
                     <button class="onboarding-btn" id="screen2Button" onclick="nextOnboardingScreen(3)">
                         Продолжить
@@ -258,7 +289,6 @@ function loadOnboarding() {
                 </div>
             </div>
 
-            <!-- Экран 3: Карьера -->
             <div class="onboarding-screen" id="screen3">
                 <div class="onboarding-header">
                     <h2 class="profile-section-title">Карьера</h2>
@@ -276,7 +306,6 @@ function loadOnboarding() {
                 </div>
             </div>
 
-            <!-- Экран 4: Характер -->
             <div class="onboarding-screen" id="screen4">
                 <div class="onboarding-header">
                     <h2 class="profile-section-title">Характер</h2>
@@ -294,7 +323,6 @@ function loadOnboarding() {
                 </div>
             </div>
 
-            <!-- Экран 5: Цели отношений -->
             <div class="onboarding-screen" id="screen5">
                 <div class="onboarding-header">
                     <h2 class="profile-section-title">Цели отношений</h2>
@@ -312,7 +340,6 @@ function loadOnboarding() {
                 </div>
             </div>
 
-            <!-- Экран 6: Ценности -->
             <div class="onboarding-screen" id="screen6">
                 <div class="onboarding-header">
                     <h2 class="profile-section-title">Ценности</h2>
@@ -330,7 +357,6 @@ function loadOnboarding() {
                 </div>
             </div>
 
-            <!-- Экран 7: Музыка -->
             <div class="onboarding-screen" id="screen7">
                 <div class="onboarding-header">
                     <h2 class="profile-section-title">Любимая музыка</h2>
@@ -349,7 +375,6 @@ function loadOnboarding() {
                 </div>
             </div>
 
-            <!-- Экран 8: Фильмы -->
             <div class="onboarding-screen" id="screen8">
                 <div class="onboarding-header">
                     <h2 class="profile-section-title">Любимые фильмы</h2>
@@ -368,7 +393,6 @@ function loadOnboarding() {
                 </div>
             </div>
 
-            <!-- Экран 9: Хобби -->
             <div class="onboarding-screen" id="screen9">
                 <div class="onboarding-header">
                     <h2 class="profile-section-title">Хобби и увлечения</h2>
@@ -387,7 +411,6 @@ function loadOnboarding() {
                 </div>
             </div>
 
-            <!-- Экран 10: Мероприятия -->
             <div class="onboarding-screen" id="screen10">
                 <div class="onboarding-header">
                     <h2 class="profile-section-title">Мероприятия</h2>
@@ -408,12 +431,10 @@ function loadOnboarding() {
         </div>
     `;
     
-    // Инициализируем обработчики после создания DOM
     initOnboarding();
     initSparkAnimation();
 }
 
-// Функция для инициализации анимации искры (добавлена отдельно)
 function initSparkAnimation() {
     const sparkContainer = document.getElementById('sparkContainer');
     const authContainer = document.getElementById('authContainer');
@@ -432,7 +453,6 @@ function initSparkAnimation() {
     let isAnimating = false;
     let animationId;
 
-    // Получаем позицию искры относительно страницы
     function getSparkPosition() {
         const rect = sparkContainer.getBoundingClientRect();
         return {
@@ -441,7 +461,6 @@ function initSparkAnimation() {
         };
     }
 
-    // Пререндеренные текстуры для частиц
     function createParticleTexture(size, colorStops) {
         const canvas = document.createElement('canvas');
         canvas.width = size;
@@ -463,7 +482,6 @@ function initSparkAnimation() {
         return canvas;
     }
 
-    // Создаем текстуры заранее
     const textures = {
         core: createParticleTexture(64, [
             { offset: 0, color: 'rgba(255, 255, 255, 1)' },
@@ -502,7 +520,6 @@ function initSparkAnimation() {
             this.life -= this.decay;
             this.rotation += this.rotationSpeed;
             
-            // Плавное уменьшение
             this.size *= 0.995;
             
             return this.life > 0;
@@ -535,14 +552,12 @@ function initSparkAnimation() {
     }
 
     function createRadialExplosion(x, y) {
-        // Создаем взрыв во все стороны из позиции искры
         for (let i = 0; i < 24; i++) {
             const angle = (i / 24) * Math.PI * 2;
             const speed = Math.random() * 2 + 1.5;
             particles.push(new ElegantParticle(x, y, 'core', angle, speed));
         }
         
-        // Добавляем большие glow-частицы
         for (let i = 0; i < 12; i++) {
             const angle = (i / 12) * Math.PI * 2;
             const speed = Math.random() * 1 + 0.8;
@@ -551,11 +566,9 @@ function initSparkAnimation() {
     }
 
     function animateElegantFire() {
-        // Плавное затемнение вместо резкого очищения
         ctx.fillStyle = 'rgba(10, 10, 10, 0.08)';
         ctx.fillRect(0, 0, fireCanvas.width, fireCanvas.height);
 
-        // Обновляем и рисуем частицы
         for (let i = particles.length - 1; i >= 0; i--) {
             if (!particles[i].update()) {
                 particles.splice(i, 1);
@@ -564,7 +577,6 @@ function initSparkAnimation() {
             }
         }
 
-        // Добавляем новые частицы из позиции искры
         if (isAnimating && particles.length < 60) {
             const sparkPos = getSparkPosition();
             
@@ -583,7 +595,6 @@ function initSparkAnimation() {
         animationId = requestAnimationFrame(animateElegantFire);
     }
 
-    // Добавляем обработчик клика на искру
     sparkContainer.addEventListener('click', function() {
         if (isAnimating) return;
         isAnimating = true;
@@ -592,21 +603,17 @@ function initSparkAnimation() {
         fireCanvas.classList.add('active');
         loadingContainer.style.display = 'block';
 
-        // Получаем позицию искры для взрыва
         const sparkPos = getSparkPosition();
 
-        // Плавное исчезновение искры
         sparkContainer.style.opacity = '0';
         sparkContainer.style.transition = 'opacity 0.5s ease';
 
-        // Создаем круговой взрыв из позиции искры
         setTimeout(() => {
             createRadialExplosion(sparkPos.x, sparkPos.y);
         }, 200);
 
         animateElegantFire();
 
-        // Стильная загрузка
         let progress = 0;
         const loadingInterval = setInterval(() => {
             progress += Math.random() * 8 + 2;
@@ -618,8 +625,7 @@ function initSparkAnimation() {
                     authContainer.style.display = 'none';
                     fireCanvas.classList.remove('active');
                     isAnimating = false;
-                    
-                    // Переход на следующий экран онбординга
+
                     setTimeout(() => nextOnboardingScreen(2), 1000);
                 }, 600);
             }
@@ -630,13 +636,11 @@ function initSparkAnimation() {
     window.addEventListener('resize', initCanvas);
 }
 
-// Функция для разделения строки по запятым
 function splitStringByCommas(str) {
     if (!str) return [];
     return str.split(',').map(item => item.trim()).filter(item => item !== '');
 }
 
-// Загрузка основного контента (карточки пользователей)
 async function loadMainContent() {
     const mainContent = document.getElementById('mainContent');
     const body = document.body;
@@ -644,7 +648,6 @@ async function loadMainContent() {
     body.classList.remove('onboarding-mode');
     currentUserIndex = 0;
 
-    // Показываем загрузку
     mainContent.innerHTML = `
         <div class="main-app">
             <div class="cards-container">
@@ -656,10 +659,8 @@ async function loadMainContent() {
         </div>
     `;
 
-    // Загружаем рекомендации
     recommendedUsers = await loadRecommendations();
 
-    // Показываем карточки
     mainContent.innerHTML = `
         <div class="main-app">
             <div class="cards-container">
@@ -732,7 +733,6 @@ async function loadMainContent() {
     initSwipeHandlers();
 }
 
-// Загрузка следующего пользователя
 function loadNextUser() {
     if (currentUserIndex >= recommendedUsers.length) {
         document.getElementById('noUsersMessage').style.display = 'flex';
@@ -743,16 +743,13 @@ function loadNextUser() {
     const user = recommendedUsers[currentUserIndex];
     const userCard = document.getElementById('userCard');
     
-    // Анимация появления
     userCard.style.opacity = '0';
     userCard.style.transform = 'translateY(20px)';
     
     setTimeout(() => {
-        // Обновляем данные из структуры UserDB
         document.getElementById('userName').textContent = user.name || 'Не указано';
         document.getElementById('userAgeCity').textContent = `${user.age || '?'} • ${user.city || 'Не указан'}`;
         
-        // Обрабатываем мероприятия как теги
         const eventsTagsContainer = document.getElementById('userEventsTags');
         eventsTagsContainer.innerHTML = '';
         const events = splitStringByCommas(user.event_preferences);
@@ -767,28 +764,23 @@ function loadNextUser() {
             eventsTagsContainer.innerHTML = '<span class="no-data">Не указаны</span>';
         }
         
-        // Детальная информация
         document.getElementById('detailCareer').textContent = user.career_type || 'Не указана';
         document.getElementById('detailPersonality').textContent = user.personality_type || 'Не указан';
         document.getElementById('detailRelationship').textContent = user.relationship_goal || 'Не указаны';
         document.getElementById('detailValues').textContent = user.important_values || 'Не указаны';
         
-        // Обрабатываем интересы как теги
         updateTagsContainer('detailMusic', user.music);
         updateTagsContainer('detailMovies', user.films);
         updateTagsContainer('detailHobbies', user.hobbies);
         
-        // Сбрасываем детали и подсветку
         document.getElementById('userDetails').classList.remove('active');
         resetSwipeOverlay();
         
-        // Анимация появления
         userCard.style.opacity = '1';
         userCard.style.transform = 'translateY(0)';
     }, 200);
 }
 
-// Обновление контейнера с тегами
 function updateTagsContainer(containerId, data) {
     const container = document.getElementById(containerId);
     container.innerHTML = '';
@@ -806,7 +798,6 @@ function updateTagsContainer(containerId, data) {
     }
 }
 
-// Переключение детальной информации
 function toggleUserDetails() {
     const details = document.getElementById('userDetails');
     const arrow = document.querySelector('.arrow');
@@ -815,7 +806,6 @@ function toggleUserDetails() {
     arrow.style.transform = details.classList.contains('active') ? 'rotate(180deg)' : 'rotate(0)';
 }
 
-// Отправка лайка/дизлайка на сервер
 async function sendInteraction(targetUserId, isLike) {
     try {
         const currentUser = await getCurrentUser();
@@ -846,7 +836,6 @@ async function sendInteraction(targetUserId, isLike) {
     }
 }
 
-// Инициализация свайпов
 function initSwipeHandlers() {
     const card = document.getElementById('userCard');
     
@@ -859,7 +848,6 @@ function initSwipeHandlers() {
     document.addEventListener('mouseup', handleMouseUp);
 }
 
-// Обработчики для тач-событий
 function handleTouchStart(e) {
     if (e.touches.length > 1) return;
     
@@ -890,7 +878,6 @@ function handleTouchEnd() {
     handleSwipeEnd();
 }
 
-// Обработчики для мыши
 function handleMouseDown(e) {
     startX = e.clientX;
     currentX = startX;
@@ -916,7 +903,6 @@ function handleMouseUp() {
     handleSwipeEnd();
 }
 
-// Обновление позиции карточки
 function updateCardPosition() {
     const card = document.getElementById('userCard');
     const deltaX = currentX - startX;
@@ -925,7 +911,6 @@ function updateCardPosition() {
     card.style.transform = `translateX(${deltaX}px) rotate(${rotation}deg)`;
 }
 
-// Обновление подсветки свайпа
 function updateSwipeOverlay() {
     const deltaX = currentX - startX;
     const swipeThreshold = 50;
@@ -933,20 +918,16 @@ function updateSwipeOverlay() {
     const likeOverlay = document.querySelector('.swipe-like');
     const dislikeOverlay = document.querySelector('.swipe-dislike');
     
-    // Сбрасываем все подсветки
     likeOverlay.style.opacity = '0';
     dislikeOverlay.style.opacity = '0';
     
     if (deltaX > swipeThreshold) {
-        // Свайп вправо - лайк (зеленая подсветка)
         likeOverlay.style.opacity = Math.min((deltaX - swipeThreshold) / 100, 0.3).toString();
     } else if (deltaX < -swipeThreshold) {
-        // Свайп влево - дизлайк (красная подсветка)
         dislikeOverlay.style.opacity = Math.min(Math.abs(deltaX + swipeThreshold) / 100, 0.3).toString();
     }
 }
 
-// Сброс подсветки свайпа
 function resetSwipeOverlay() {
     const likeOverlay = document.querySelector('.swipe-like');
     const dislikeOverlay = document.querySelector('.swipe-dislike');
@@ -955,7 +936,6 @@ function resetSwipeOverlay() {
     dislikeOverlay.style.opacity = '0';
 }
 
-// Обработка завершения свайпа
 function handleSwipeEnd() {
     const card = document.getElementById('userCard');
     const deltaX = currentX - startX;
@@ -964,14 +944,12 @@ function handleSwipeEnd() {
     card.style.transition = 'all 0.5s ease';
     
     if (Math.abs(deltaX) > swipeThreshold) {
-        // Свайп влево (дизлайк) или вправо (лайк)
         const direction = deltaX > 0 ? 1 : -1;
         const isLike = deltaX > 0;
         
         card.style.transform = `translateX(${direction * 500}px) rotate(${direction * 30}deg)`;
         card.style.opacity = '0';
         
-        // Отправляем взаимодействие на сервер
         const currentUser = recommendedUsers[currentUserIndex];
         if (currentUser) {
             sendInteraction(currentUser.id, isLike);
@@ -986,21 +964,18 @@ function handleSwipeEnd() {
         console.log(isLike ? 'Лайк' : 'Дизлайк', recommendedUsers[currentUserIndex]?.name);
         
     } else {
-        // Возвращаем карточку на место
         resetCardPosition();
     }
     
     resetSwipeOverlay();
 }
 
-// Сброс позиции карточки
 function resetCardPosition() {
     const card = document.getElementById('userCard');
     card.style.transform = 'translateX(0) rotate(0)';
     card.style.opacity = '1';
 }
 
-// Инициализация анкеты
 function initOnboarding() {
     console.log('Инициализация анкеты...');
     
@@ -1042,34 +1017,40 @@ function initOnboarding() {
     updateOnboardingProgress();
 }
 
-// Обновление базовой информации
 function updateBasicInfo(field, value) {
     console.log(`Обновление ${field}:`, value);
     userBasicInfo[field] = value;
+    
     checkScreen2Complete();
 }
 
-// Проверка заполненности второго экрана
 function checkScreen2Complete() {
-    const isComplete = userBasicInfo.age && userBasicInfo.city;
+    const isComplete = userBasicInfo.age && 
+                      userBasicInfo.city && 
+                      userBasicInfo.gender && 
+                      userBasicInfo.preferredGender &&
+                      userBasicInfo.vkProfile;
+    
     const button = document.getElementById('screen2Button');
     const message = document.getElementById('screen2Message');
     
-    console.log('Проверка экрана 2:', { isComplete, age: userBasicInfo.age, city: userBasicInfo.city });
+    console.log('Проверка экрана 2:', userBasicInfo);
     
     if (button) {
         if (isComplete) {
             button.classList.add('active');
-            if (message) message.textContent = '';
+            if (message) message.style.display = 'none';
         } else {
             button.classList.remove('active');
-            if (message) message.textContent = 'Заполните возраст и город';
+            if (message) {
+                message.textContent = 'Заполните все обязательные поля';
+                message.style.display = 'block';
+            }
         }
     }
     return isComplete;
 }
 
-// Переключение капсулы
 function toggleOnboardingCapsule(category, text, capsule) {
     console.log(`Клик по капсуле: ${category} - ${text}`);
     
@@ -1109,7 +1090,6 @@ function toggleOnboardingCapsule(category, text, capsule) {
     }
 }
 
-// Обновление тегов
 function updateOnboardingTags(category) {
     const tagsContainer = document.getElementById(`${category}Tags`);
     if (!tagsContainer) return;
@@ -1124,7 +1104,6 @@ function updateOnboardingTags(category) {
     });
 }
 
-// Удаление выбранного элемента
 function removeSelectedItem(category, item) {
     console.log(`Удаление: ${category} - ${item}`);
     
@@ -1153,7 +1132,6 @@ function removeSelectedItem(category, item) {
     }
 }
 
-// Обновление счетчика выбора
 function updateSelectionCounter(category) {
     const counter = document.getElementById(`${category}Counter`);
     if (!counter) return;
@@ -1169,7 +1147,6 @@ function updateSelectionCounter(category) {
     }
 }
 
-// Обновление состояния кнопок для одиночного выбора
 function updateCapsulesButtonState(category) {
     const screenNumber = getScreenByCategory(category);
     const button = document.getElementById(`screen${screenNumber}Button`);
@@ -1189,7 +1166,6 @@ function updateCapsulesButtonState(category) {
     }
 }
 
-// Обновление состояния кнопки для множественного выбора
 function updateMultipleSelectionButtonState(category) {
     const screenNumber = getScreenByCategory(category);
     const button = document.getElementById(`screen${screenNumber}Button`);
@@ -1209,7 +1185,6 @@ function updateMultipleSelectionButtonState(category) {
     }
 }
 
-// Вспомогательные функции
 function getCategoryByScreen(screenNumber) {
     const categories = ['career', 'personality', 'relationship', 'values', 'music', 'movies', 'hobbies', 'events'];
     return categories[screenNumber - 3] || 'career';
@@ -1220,7 +1195,6 @@ function getScreenByCategory(category) {
     return categories.indexOf(category) + 3;
 }
 
-// Переход между экранами
 function nextOnboardingScreen(screenNumber) {
     console.log(`Переход с экрана ${currentOnboardingScreen} на ${screenNumber}`);
     
@@ -1237,12 +1211,21 @@ function nextOnboardingScreen(screenNumber) {
         }
     }
     
-    if (currentOnboardingScreen >= 7) {
+    if (currentOnboardingScreen >= 7 && currentOnboardingScreen <= 10) {
         const currentCategory = getCategoryByScreen(currentOnboardingScreen);
         if (selectedOnboardingItems[currentCategory].length === 0) {
             console.log('Нельзя перейти - не выбрано ни одного варианта');
+            const message = document.getElementById(`screen${currentOnboardingScreen}Message`);
+            if (message) {
+                message.style.display = 'block';
+            }
             return;
         }
+    }
+    
+    const currentMessage = document.getElementById(`screen${currentOnboardingScreen}Message`);
+    if (currentMessage) {
+        currentMessage.style.display = 'none';
     }
     
     const currentScreen = document.getElementById(`screen${currentOnboardingScreen}`);
@@ -1255,7 +1238,6 @@ function nextOnboardingScreen(screenNumber) {
     updateOnboardingProgress();
 }
 
-// Обновление прогресса
 function updateOnboardingProgress() {
     const progressFill = document.getElementById('onboardingProgressFill');
     if (!progressFill) return;
@@ -1265,9 +1247,25 @@ function updateOnboardingProgress() {
     console.log(`Прогресс: ${progress}%`);
 }
 
-// Завершение онбординга
 async function completeOnboarding() {
     console.log('Завершение онбординга...');
+    
+    if (selectedOnboardingItems.events.length === 0) {
+        const message = document.getElementById('screen10Message');
+        if (message) {
+            message.textContent = 'Выберите до 3 мероприятий для продолжения';
+            message.style.display = 'block';
+        }
+        console.log('Нельзя завершить - не выбраны мероприятия');
+        return;
+    }
+    
+    if (!userBasicInfo.age || !userBasicInfo.city || !userBasicInfo.gender || !userBasicInfo.preferredGender) {
+        console.log('Не заполнены основные поля:', userBasicInfo);
+        alert('Пожалуйста, заполните все обязательные поля в основной информации');
+        return;
+    }
+    
     console.log('Собранные данные:', {
         basic: userBasicInfo,
         selections: selectedOnboardingItems
@@ -1275,31 +1273,36 @@ async function completeOnboarding() {
     
     try {
         const userData = await getCurrentUser();
-        if (userData.id == 0) {
-            console.log('Пользователь не авторизован')
-        }
+        
         const name = userData.firstName || '';
         const surname = userData.lastName || '';
         const fullName = [name, surname].filter(Boolean).join(' ') || userData.username || 'Пользователь';
         
         const profileData = {
             id: userData.id,
-            username: userData.username || '',
+            username: userBasicInfo.vkProfile || '',
             name: fullName,
             surname: surname,
-            age: parseInt(userBasicInfo.age),
-            city: userBasicInfo.city,
+            age: parseInt(userBasicInfo.age) || 0,
+            city: userBasicInfo.city || '',
+            gender: parseInt(userBasicInfo.gender) || 0,
+            preferred_gender: parseInt(userBasicInfo.preferredGender) || 0,
             career_type: selectedOnboardingItems.career[0] || '',
             personality_type: selectedOnboardingItems.personality[0] || '',
             relationship_goal: selectedOnboardingItems.relationship[0] || '',
             important_values: selectedOnboardingItems.values[0] || '',
-            music: selectedOnboardingItems.music.join(',') || '',
-            films: selectedOnboardingItems.movies.join(',') || '',
-            hobbies: selectedOnboardingItems.hobbies.join(',') || '',
-            event_preferences: selectedOnboardingItems.events.join(',') || ''
+            music: selectedOnboardingItems.music.join(', ') || '',
+            films: selectedOnboardingItems.movies.join(', ') || '',
+            hobbies: selectedOnboardingItems.hobbies.join(', ') || '',
+            event_preferences: selectedOnboardingItems.events.join(', ') || '',
         };
 
         console.log('Отправка данных на сервер:', profileData);
+        
+        const button = document.getElementById('screen10Button');
+        const originalText = button.textContent;
+        button.textContent = 'Сохранение...';
+        button.disabled = true;
         
         const response = await fetch('http://localhost:8080/createuser', {
             method: 'POST',
@@ -1311,14 +1314,21 @@ async function completeOnboarding() {
 
         if (response.ok) {
             console.log('Профиль успешно создан');
-            location.reload();
+            
+            setTimeout(() => {
+                location.reload();
+            }, 1000);
+            
         } else {
-            console.error('Ошибка при создании профиля:', response.status);
-            alert('Ошибка при создании профиля');
+            const errorText = await response.text();
+            console.error('Ошибка при создании профиля:', response.status, errorText);
+            button.textContent = originalText;
+            button.disabled = false;
         }
     } catch (error) {
         console.error('Ошибка при сохранении профиля:', error);
-        alert('Ошибка при сохранении профиля');
+        const button = document.getElementById('screen10Button');
+        button.textContent = 'Завершить профиль';
     }
 }
 
@@ -1327,7 +1337,6 @@ function editProfile() {
     loadOnboarding();
 }
 
-// Основная функция
 async function initApp() {
     console.log('Инициализация приложения...');
     
@@ -1356,5 +1365,4 @@ async function initApp() {
     }
 }
 
-// Запускаем приложение после загрузки DOM
 document.addEventListener('DOMContentLoaded', initApp);

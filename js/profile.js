@@ -42,19 +42,15 @@ async function getCurrentUser() {
             return 0;
         }
 
-        console.log('Raw initData:', initData);
-
         let decodedString;
         
         if (typeof initData === 'object') {
-            console.log('InitData is object, using directly');
             const user = initData.user || initData;
             return user.id || 0;
         }
         
         if (typeof initData === 'string') {
             decodedString = decodeURIComponent(initData);
-            console.log('Decoded initData:', decodedString);
 
             const params = new URLSearchParams(decodedString);
             const receivedHash = params.get('hash');
@@ -84,7 +80,6 @@ async function getCurrentUser() {
             dataPairs.sort();
             
             const dataCheckString = dataPairs.join('\n');
-            console.log('Data check string:', dataCheckString);
 
             const botToken = 'f9LHodD0cOLRQi29OdyXpiSqLM-SyPUJnePMbZQH3ceilC7cKmf12ib4C7Oeda975ZN_gzuX6fJmQVKE5j1e';
             
@@ -122,16 +117,12 @@ async function getCurrentUser() {
                 .map(b => b.toString(16).padStart(2, '0'))
                 .join('');
             
-            console.log('Calculated hash:', calculatedHash);
-            console.log('Received hash:', receivedHash);
 
             if (calculatedHash === receivedHash) {
-                console.log('Hash validation successful');
                 
                 if (userParam) {
                     try {
                         const userData = JSON.parse(userParam);
-                        console.log('User data:', userData);
                         return userData.id || 0;
                     } catch (parseError) {
                         console.error('Error parsing user data:', parseError);
@@ -139,7 +130,6 @@ async function getCurrentUser() {
                     }
                 }
             } else {
-                console.log('Hash validation failed');
                 return 0;
             }
         }
@@ -216,8 +206,10 @@ async function fetchUserProfile() {
 async function updateUserProfile(profileData) {
     try {
         const userId = await getCurrentUser();
-        console.log(userId)
-        profileData.id = userId
+        console.log('Updating profile for user:', userId);
+        console.log('Profile data:', profileData);
+        
+        profileData.id = userId;
 
         const response = await fetch(`http://localhost:8080/updateuser?id=${userId}`, {
             method: 'POST',
@@ -231,10 +223,11 @@ async function updateUserProfile(profileData) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
         
-        return await response.json();
+        const result = await response.json();
+        console.log('Profile updated successfully:', result);
+        return result;
     } catch (error) {
-        console.error('Ошибка обновления профиля:', error);
-        throw error;
+        
     }
 }
 
@@ -274,10 +267,8 @@ function parseServerData(userData) {
 }
 
 function prepareDataForServer(profileData) {
-    const userId = currentUserId || (async () => await getCurrentUser())();
-    
     return {
-        id: userId,
+        id: currentUserId,
         name: profileData.name || '',
         surname: profileData.surname || '',
         age: parseInt(profileData.age) || 0,
@@ -285,14 +276,14 @@ function prepareDataForServer(profileData) {
         gender: userGender,
         preferred_gender: preferredGender,
         career_place: profileData.careerPlace || '',
-        career_type: (profileData.career || []).join(','),
-        personality_type: (profileData.personality || []).join(','),
-        relationship_goal: (profileData.relationship || []).join(','),
-        important_values: (profileData.values || []).join(','),
-        music: (profileData.music || []).join(','),
-        hobbies: (profileData.hobbies || []).join(','),
-        films: (profileData.movies || []).join(','),
-        event_preferences: (profileData.events || []).join(',')
+        career_type: (selectedItems.career || []).join(','),
+        personality_type: (selectedItems.personality || []).join(','),
+        relationship_goal: (selectedItems.relationship || []).join(','),
+        important_values: (selectedItems.values || []).join(','),
+        music: (selectedItems.music || []).join(','),
+        hobbies: (selectedItems.hobbies || []).join(','),
+        films: (selectedItems.movies || []).join(','),
+        event_preferences: (selectedItems.events || []).join(',')
     };
 }
 
@@ -427,29 +418,20 @@ async function initCapsules() {
         });
 
         await loadProfileData();
-        makeFieldsReadonly();
+        makeNameFieldReadonly();
 
     } catch (error) {
         console.error('Ошибка инициализации капсул:', error);
     }
 }
 
-function makeFieldsReadonly() {
-    const nameField = document.querySelector('[onclick="openModal(\'name\')"]');
-    const cityField = document.querySelector('[onclick="openModal(\'city\')"]');
-    
+function makeNameFieldReadonly() {
+    const nameField = document.querySelector('.readonly-field');
     if (nameField) {
         nameField.style.pointerEvents = 'none';
         nameField.style.opacity = '0.7';
         nameField.style.cursor = 'default';
         nameField.title = 'Имя нельзя изменить';
-    }
-    
-    if (cityField) {
-        cityField.style.pointerEvents = 'none';
-        cityField.style.opacity = '0.7';
-        cityField.style.cursor = 'default';
-        cityField.title = 'Город нельзя изменить';
     }
 }
 
@@ -543,7 +525,7 @@ function selectPreferredGender(gender, label) {
 }
 
 function openModal(field) {
-    if (field === 'name' || field === 'city') {
+    if (field === 'name') {
         return;
     }
     
@@ -553,7 +535,8 @@ function openModal(field) {
     const input = document.getElementById('modalInput');
     
     const fieldTitles = {
-        age: 'Возраст'
+        age: 'Возраст',
+        city: 'Город'
     };
     
     if (!modal || !title || !input) {
@@ -565,7 +548,11 @@ function openModal(field) {
     
     const valueElement = document.getElementById(`${field}Value`);
     if (valueElement) {
-        input.value = valueElement.textContent.replace(' лет', '');
+        if (field === 'age') {
+            input.value = valueElement.textContent.replace(' лет', '');
+        } else {
+            input.value = valueElement.textContent;
+        }
     }
     
     input.placeholder = `Введите ${fieldTitles[field].toLowerCase()}`;
@@ -592,6 +579,8 @@ function saveField() {
     
     if (currentField === 'age') {
         valueElement.textContent = value + ' лет';
+    } else if (currentField === 'city') {
+        valueElement.textContent = value;
     }
     
     closeModal();
@@ -604,14 +593,8 @@ async function saveProfile() {
             age: document.getElementById('ageValue')?.textContent.replace(' лет', '') || '',
             city: document.getElementById('cityValue')?.textContent || '',
             careerPlace: '',
-            career: selectedItems.career,
-            personality: selectedItems.personality,
-            relationship: selectedItems.relationship,
-            values: selectedItems.values,
-            music: selectedItems.music,
-            hobbies: selectedItems.hobbies,
-            movies: selectedItems.movies,
-            events: selectedItems.events
+            gender: userGender,
+            preferredGender: preferredGender
         };
         
         const serverData = prepareDataForServer(profileData);
