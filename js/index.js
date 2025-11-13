@@ -16,13 +16,10 @@ function waitForWebApp() {
         const maxAttempts = 50;
         
         const check = () => {
-            console.log(window.WebApp.initData)
             attempts++;
             if (window.WebApp) {
                 WebApp = window.WebApp;
                 initData = window.WebApp?.initData;
-                console.log('WebApp загружен:', WebApp);
-                console.log('InitData:', initData);
                 resolve();
             } else if (attempts < maxAttempts) {
                 setTimeout(check, 100);
