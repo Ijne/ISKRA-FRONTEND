@@ -1,7 +1,6 @@
 let initData = null;
 let WebApp = null;
 
-// Ждем загрузки библиотеки Telegram WebApp
 function waitForWebApp() {
     return new Promise((resolve, reject) => {
         if (window.WebApp) {
@@ -33,7 +32,6 @@ function waitForWebApp() {
     });
 }
 
-// Функция для парсинга initData и извлечения данных пользователя
 function parseInitData(initData) {
     console.log('Parsing initData:', initData);
     
@@ -85,17 +83,16 @@ async function getCurrentUser() {
         
         if (!initData) {
             console.error('No init data found');
-            return null;
+            return { id: 0 };
         }
 
         console.log('Raw initData:', initData);
 
-        // Парсим данные пользователя
         const userData = parseInitData(initData);
         
         if (!userData || !userData.id) {
             console.error('No user data found in initData');
-            return null;
+            return { id: 0 };
         }
 
         console.log('Extracted user data:', userData);
@@ -103,11 +100,10 @@ async function getCurrentUser() {
         
     } catch (error) {
         console.error('Error getting current user:', error);
-        return null;
+        return { id: 0 };
     }
 }
 
-// Глобальные переменные
 let currentOnboardingScreen = 1;
 const selectedOnboardingItems = {
     career: [],
@@ -124,21 +120,15 @@ let userBasicInfo = {
     city: ''
 };
 
-// Данные пользователей (будут загружаться с сервера)
 let recommendedUsers = [];
 let currentUserIndex = 0;
 let startX = 0;
 let currentX = 0;
 let isDragging = false;
 
-// Проверка авторизации
 async function checkUserAuthorization() {
     const userData = await getCurrentUser();
     console.log('Проверка пользователя:', userData);
-    
-    if (!userData || !userData.id) {
-        return { authorized: false, userData: null };
-    }
     
     try {
         const response = await fetch(`http://localhost:8080/profile?id=${userData.id}`);
@@ -150,25 +140,16 @@ async function checkUserAuthorization() {
         const serverUserData = await response.json();
         console.log('Данные пользователя с сервера:', serverUserData);
         
-        if (serverUserData.id) {
-            return { authorized: true, userData: serverUserData };
-        } else {
-            return { authorized: false, userData: null };
-        }
+        return { authorized: true, userData: serverUserData };
     } catch (error) {
         console.error('Ошибка при проверке авторизации:', error);
         return { authorized: false, userData: null };
     }
 }
 
-// Загрузка рекомендаций с сервера
 async function loadRecommendations() {
     try {
         const userData = await getCurrentUser();
-        if (!userData || !userData.id) {
-            console.error('Не удалось получить данные пользователя');
-            return [];
-        }
         
         console.log('Загрузка рекомендаций для пользователя:', userData.id);
         
@@ -191,11 +172,9 @@ async function loadRecommendations() {
     }
 }
 
-// Загрузка анкеты
 function loadOnboarding() {
     console.log('Загрузка анкеты...');
     
-    // Сбрасываем данные
     Object.keys(selectedOnboardingItems).forEach(key => {
         selectedOnboardingItems[key] = [];
     });
@@ -208,30 +187,41 @@ function loadOnboarding() {
     
     mainContent.innerHTML = `
         <div class="onboarding-container">
-            <div class="onboarding-progress">
-                <div class="onboarding-progress-fill" id="onboardingProgressFill"></div>
-            </div>
+            <canvas id="fireCanvas"></canvas>
 
-            <!-- Экран 1: Приветствие -->
-            <div class="onboarding-screen active" id="screen1">
-                <div class="onboarding-header">
-                    <h1 class="onboarding-title">ISKRA</h1>
-                    <p class="onboarding-subtitle">Создадим твой уникальный профиль</p>
-                </div>
-                
-                <div class="onboarding-board">
-                    <div class="avatar-section">
-                        <div class="onboarding-avatar">
-                            <span>IS</span>
+            <div class="auth-container" id="authContainer">
+                <div class="spark-container" id="sparkContainer">
+                    <div class="pulse-ring"></div>
+                    <div class="spark-elegant">
+                        <div class="spark-dot"></div>
+                        <div class="spark-orbit">
+                            <div class="orbit-particle"></div>
+                        </div>
+                        <div class="spark-orbit">
+                            <div class="orbit-particle"></div>
+                        </div>
+                        <div class="spark-orbit">
+                            <div class="orbit-particle"></div>
+                        </div>
+                        <div class="spark-orbit">
+                            <div class="orbit-particle"></div>
                         </div>
                     </div>
-                    
-                    <p class="onboarding-subtitle">Расскажи о себе, и мы найдем тебе идеальную пару</p>
-                    
-                    <button class="onboarding-btn active" onclick="nextOnboardingScreen(2)">
-                        Начать заполнение
-                    </button>
+                    <div class="click-hint">Коснись меня</div>
                 </div>
+                
+                <h1 class="auth-title">ИСКРА</h1>
+                <p class="auth-subtitle">Прикоснись к энергии новых встреч</p>
+                
+                <div class="loading-container" id="loadingContainer">
+                    <div class="loading-text">Зажигание</div>
+                    <div class="loading-bar">
+                        <div class="loading-progress" id="loadingProgress"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="onboarding-progress">
+                <div class="onboarding-progress-fill" id="onboardingProgressFill"></div>
             </div>
 
             <!-- Экран 2: Основная информация -->
@@ -418,7 +408,226 @@ function loadOnboarding() {
         </div>
     `;
     
+    // Инициализируем обработчики после создания DOM
     initOnboarding();
+    initSparkAnimation();
+}
+
+// Функция для инициализации анимации искры (добавлена отдельно)
+function initSparkAnimation() {
+    const sparkContainer = document.getElementById('sparkContainer');
+    const authContainer = document.getElementById('authContainer');
+    const mainContainer = document.getElementById('mainContainer');
+    const fireCanvas = document.getElementById('fireCanvas');
+    const loadingContainer = document.getElementById('loadingContainer');
+    const loadingProgress = document.getElementById('loadingProgress');
+
+    if (!sparkContainer) {
+        console.error('sparkContainer не найден');
+        return;
+    }
+
+    let ctx = fireCanvas.getContext('2d');
+    let particles = [];
+    let isAnimating = false;
+    let animationId;
+
+    // Получаем позицию искры относительно страницы
+    function getSparkPosition() {
+        const rect = sparkContainer.getBoundingClientRect();
+        return {
+            x: rect.left + rect.width / 2,
+            y: rect.top + rect.height / 2
+        };
+    }
+
+    // Пререндеренные текстуры для частиц
+    function createParticleTexture(size, colorStops) {
+        const canvas = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        
+        const gradient = ctx.createRadialGradient(
+            size/2, size/2, 0,
+            size/2, size/2, size/2
+        );
+        
+        colorStops.forEach(stop => {
+            gradient.addColorStop(stop.offset, stop.color);
+        });
+        
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, size, size);
+        
+        return canvas;
+    }
+
+    // Создаем текстуры заранее
+    const textures = {
+        core: createParticleTexture(64, [
+            { offset: 0, color: 'rgba(255, 255, 255, 1)' },
+            { offset: 0.2, color: 'rgba(255, 255, 200, 0.8)' },
+            { offset: 0.4, color: 'rgba(255, 200, 100, 0.6)' },
+            { offset: 1, color: 'rgba(255, 100, 0, 0)' }
+        ]),
+        glow: createParticleTexture(128, [
+            { offset: 0, color: 'rgba(255, 200, 100, 0.4)' },
+            { offset: 0.3, color: 'rgba(255, 150, 50, 0.2)' },
+            { offset: 1, color: 'rgba(255, 100, 0, 0)' }
+        ])
+    };
+
+    class ElegantParticle {
+        constructor(x, y, type, angle, speed) {
+            this.x = x;
+            this.y = y;
+            this.type = type;
+            this.angle = angle;
+            this.speed = speed;
+            this.vx = Math.cos(angle) * speed;
+            this.vy = Math.sin(angle) * speed;
+            this.life = 1;
+            this.decay = Math.random() * 0.008 + 0.005;
+            this.size = type === 'core' ? 
+                Math.random() * 12 + 8 : 
+                Math.random() * 35 + 25;
+            this.rotation = Math.random() * Math.PI * 2;
+            this.rotationSpeed = (Math.random() - 0.5) * 0.02;
+        }
+
+        update() {
+            this.x += this.vx;
+            this.y += this.vy;
+            this.life -= this.decay;
+            this.rotation += this.rotationSpeed;
+            
+            // Плавное уменьшение
+            this.size *= 0.995;
+            
+            return this.life > 0;
+        }
+
+        draw() {
+            const texture = textures[this.type];
+            const alpha = this.life;
+            const size = this.size;
+            
+            ctx.save();
+            ctx.globalAlpha = alpha;
+            ctx.translate(this.x, this.y);
+            ctx.rotate(this.rotation);
+            
+            ctx.drawImage(
+                texture, 
+                -size/2, -size/2, 
+                size, size
+            );
+            
+            ctx.restore();
+        }
+    }
+
+    function initCanvas() {
+        fireCanvas.width = window.innerWidth;
+        fireCanvas.height = window.innerHeight;
+        ctx = fireCanvas.getContext('2d');
+    }
+
+    function createRadialExplosion(x, y) {
+        // Создаем взрыв во все стороны из позиции искры
+        for (let i = 0; i < 24; i++) {
+            const angle = (i / 24) * Math.PI * 2;
+            const speed = Math.random() * 2 + 1.5;
+            particles.push(new ElegantParticle(x, y, 'core', angle, speed));
+        }
+        
+        // Добавляем большие glow-частицы
+        for (let i = 0; i < 12; i++) {
+            const angle = (i / 12) * Math.PI * 2;
+            const speed = Math.random() * 1 + 0.8;
+            particles.push(new ElegantParticle(x, y, 'glow', angle, speed));
+        }
+    }
+
+    function animateElegantFire() {
+        // Плавное затемнение вместо резкого очищения
+        ctx.fillStyle = 'rgba(10, 10, 10, 0.08)';
+        ctx.fillRect(0, 0, fireCanvas.width, fireCanvas.height);
+
+        // Обновляем и рисуем частицы
+        for (let i = particles.length - 1; i >= 0; i--) {
+            if (!particles[i].update()) {
+                particles.splice(i, 1);
+            } else {
+                particles[i].draw();
+            }
+        }
+
+        // Добавляем новые частицы из позиции искры
+        if (isAnimating && particles.length < 60) {
+            const sparkPos = getSparkPosition();
+            
+            if (Math.random() < 0.4) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = Math.random() * 1.2 + 0.5;
+                particles.push(new ElegantParticle(sparkPos.x, sparkPos.y, 'core', angle, speed));
+            }
+            if (Math.random() < 0.15) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = Math.random() * 0.8 + 0.3;
+                particles.push(new ElegantParticle(sparkPos.x, sparkPos.y, 'glow', angle, speed));
+            }
+        }
+
+        animationId = requestAnimationFrame(animateElegantFire);
+    }
+
+    // Добавляем обработчик клика на искру
+    sparkContainer.addEventListener('click', function() {
+        if (isAnimating) return;
+        isAnimating = true;
+
+        initCanvas();
+        fireCanvas.classList.add('active');
+        loadingContainer.style.display = 'block';
+
+        // Получаем позицию искры для взрыва
+        const sparkPos = getSparkPosition();
+
+        // Плавное исчезновение искры
+        sparkContainer.style.opacity = '0';
+        sparkContainer.style.transition = 'opacity 0.5s ease';
+
+        // Создаем круговой взрыв из позиции искры
+        setTimeout(() => {
+            createRadialExplosion(sparkPos.x, sparkPos.y);
+        }, 200);
+
+        animateElegantFire();
+
+        // Стильная загрузка
+        let progress = 0;
+        const loadingInterval = setInterval(() => {
+            progress += Math.random() * 8 + 2;
+            if (progress >= 100) {
+                progress = 100;
+                clearInterval(loadingInterval);
+                
+                setTimeout(() => {
+                    authContainer.style.display = 'none';
+                    fireCanvas.classList.remove('active');
+                    isAnimating = false;
+                    
+                    // Переход на следующий экран онбординга
+                    setTimeout(() => nextOnboardingScreen(2), 1000);
+                }, 600);
+            }
+            loadingProgress.style.width = progress + '%';
+        }, 120);
+    });
+
+    window.addEventListener('resize', initCanvas);
 }
 
 // Функция для разделения строки по запятым
@@ -428,9 +637,7 @@ function splitStringByCommas(str) {
 }
 
 // Загрузка основного контента (карточки пользователей)
-async function loadMainContent(userData) {
-    console.log('Загрузка основного контента:', userData);
-    
+async function loadMainContent() {
     const mainContent = document.getElementById('mainContent');
     const body = document.body;
     
@@ -612,10 +819,6 @@ function toggleUserDetails() {
 async function sendInteraction(targetUserId, isLike) {
     try {
         const currentUser = await getCurrentUser();
-        if (!currentUser || !currentUser.id) {
-            console.error('Не удалось получить данные текущего пользователя');
-            return;
-        }
         
         const interactionType = isLike ? 'like' : 'dislike';
         
@@ -1072,12 +1275,9 @@ async function completeOnboarding() {
     
     try {
         const userData = await getCurrentUser();
-        if (!userData || !userData.id) {
-            alert('Ошибка: пользователь не авторизован');
-            return;
+        if (userData.id == 0) {
+            console.log('Пользователь не авторизован')
         }
-        
-        // Создаем имя пользователя из firstName и lastName
         const name = userData.firstName || '';
         const surname = userData.lastName || '';
         const fullName = [name, surname].filter(Boolean).join(' ') || userData.username || 'Пользователь';
@@ -1116,7 +1316,6 @@ async function completeOnboarding() {
             console.error('Ошибка при создании профиля:', response.status);
             alert('Ошибка при создании профиля');
         }
-
     } catch (error) {
         console.error('Ошибка при сохранении профиля:', error);
         alert('Ошибка при сохранении профиля');
@@ -1133,21 +1332,27 @@ async function initApp() {
     console.log('Инициализация приложения...');
     
     try {
-        // Ждем загрузки WebApp
-        await waitForWebApp();
-        
+        const bottomNav = document.getElementById('bottomNav');
+        bottomNav.style.display = 'none';
         const authStatus = await checkUserAuthorization();
         console.log('Статус авторизации:', authStatus);
         
         if (authStatus.authorized) {
-            loadMainContent(authStatus.userData);
+            const bottomNav = document.getElementById('bottomNav');
+            bottomNav.style.display = 'flex';
+            await waitForWebApp();
+            await loadMainContent();
         } else {
+            await waitForWebApp();
             loadOnboarding();
         }
     } catch (error) {
-        console.error('Ошибка инициализации:', error);
-        // Если WebApp не загрузился, все равно показываем онбординг
-        loadOnboarding();
+        const authStatus = await checkUserAuthorization();
+        if (authStatus.authorized) {
+            await loadMainContent();
+        } else {
+            loadOnboarding();
+        }
     }
 }
 

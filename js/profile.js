@@ -39,7 +39,7 @@ async function getCurrentUser() {
         
         if (!initData) {
             console.error('No init data found');
-            return null;
+            return 0;
         }
 
         console.log('Raw initData:', initData);
@@ -49,7 +49,7 @@ async function getCurrentUser() {
         if (typeof initData === 'object') {
             console.log('InitData is object, using directly');
             const user = initData.user || initData;
-            return user.id || null;
+            return user.id || 0;
         }
         
         if (typeof initData === 'string') {
@@ -65,12 +65,12 @@ async function getCurrentUser() {
                 if (userParam) {
                     try {
                         const userData = JSON.parse(userParam);
-                        return userData.id || null;
+                        return userData.id || 0;
                     } catch (e) {
                         console.error('Error parsing user data:', e);
                     }
                 }
-                return null;
+                return 0;
             }
 
             const userParam = params.get('user');
@@ -132,15 +132,15 @@ async function getCurrentUser() {
                     try {
                         const userData = JSON.parse(userParam);
                         console.log('User data:', userData);
-                        return userData.id || null;
+                        return userData.id || 0;
                     } catch (parseError) {
                         console.error('Error parsing user data:', parseError);
-                        return null;
+                        return 0;
                     }
                 }
             } else {
                 console.log('Hash validation failed');
-                return null;
+                return 0;
             }
         }
         
@@ -189,17 +189,11 @@ const maxSelections = {
     events: 3
 };
 
-const API_BASE_URL = 'http://localhost:8080';
-
 async function fetchUserProfile() {
     try {
         const userId = await getCurrentUser();
-        if (!userId) {
-            console.error('No user ID available');
-            return null;
-        }
 
-        const response = await fetch(`${API_BASE_URL}/profile?id=${userId}`, {
+        const response = await fetch(`http://localhost:8080/profile?id=${userId}`, {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json'
@@ -222,11 +216,10 @@ async function fetchUserProfile() {
 async function updateUserProfile(profileData) {
     try {
         const userId = await getCurrentUser();
-        if (!userId) {
-            throw new Error('No user ID available for update');
-        }
+        console.log(userId)
+        profileData.id = userId
 
-        const response = await fetch(`${API_BASE_URL}/updateuser?id=${userId}`, {
+        const response = await fetch(`http://localhost:8080/updateuser?id=${userId}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
