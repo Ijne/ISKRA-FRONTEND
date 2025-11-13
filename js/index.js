@@ -3,6 +3,8 @@ let WebApp = null;
 
 function waitForWebApp() {
     return new Promise((resolve, reject) => {
+        console.log(window.WebApp)
+
         if (window.WebApp) {
             WebApp = window.WebApp;
             initData = window.WebApp?.initData;
@@ -14,6 +16,7 @@ function waitForWebApp() {
         const maxAttempts = 200;
         
         const check = () => {
+            console.log(window.WebApp.initData)
             attempts++;
             if (window.WebApp) {
                 WebApp = window.WebApp;
