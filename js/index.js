@@ -13,7 +13,7 @@ function waitForWebApp() {
         }
 
         let attempts = 0;
-        const maxAttempts = 200;
+        const maxAttempts = 50;
         
         const check = () => {
             console.log(window.WebApp.initData)
