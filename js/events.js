@@ -1,5 +1,3 @@
-let initData = null;
-let WebApp = null;
 const API_BASE_URL = 'http://localhost:8080';
 
 let currentEvents = [];
@@ -10,13 +8,14 @@ let currentSkip = 0;
 const limit = 5;
 let isLoading = false;
 let hasMoreEvents = true;
+let initData = null;
+let WebApp = null;
 
 function waitForWebApp() {
-    return new Promise((resolve) => {
-        if (window.WebApp?.initData) {
+    return new Promise((resolve, reject) => {
+        if (window.WebApp) {
             WebApp = window.WebApp;
             initData = window.WebApp?.initData;
-            console.log('WebApp загружен:', WebApp);
             resolve();
             return;
         }
@@ -50,16 +49,16 @@ async function getCurrentUser() {
         
         if (!initData) {
             console.error('No init data found');
-            return null;
+            return 0;
         }
 
         let decodedString;
         
         if (typeof initData === 'object') {
             const user = initData.user || initData;
-            return user.id || null;
+            return user.id || 0;
         }
-
+        
         if (typeof initData === 'string') {
             decodedString = decodeURIComponent(initData);
 
@@ -72,12 +71,12 @@ async function getCurrentUser() {
                 if (userParam) {
                     try {
                         const userData = JSON.parse(userParam);
-                        return userData.id || null;
+                        return userData.id || 0;
                     } catch (e) {
                         console.error('Error parsing user data:', e);
                     }
                 }
-                return null;
+                return 0;
             }
 
             const userParam = params.get('user');
@@ -128,25 +127,20 @@ async function getCurrentUser() {
                 .map(b => b.toString(16).padStart(2, '0'))
                 .join('');
             
-            console.log('Calculated hash:', calculatedHash);
-            console.log('Received hash:', receivedHash);
 
             if (calculatedHash === receivedHash) {
-                console.log('Hash validation successful');
                 
                 if (userParam) {
                     try {
                         const userData = JSON.parse(userParam);
-                        console.log('User data:', userData);
-                        return userData.id || null;
+                        return userData.id || 0;
                     } catch (parseError) {
                         console.error('Error parsing user data:', parseError);
-                        return null;
+                        return 0;
                     }
                 }
             } else {
-                console.log('Hash validation failed');
-                return null;
+                return 0;
             }
         }
         
@@ -162,47 +156,17 @@ async function initApp() {
         await waitForWebApp();
         console.log('Приложение инициализировано');
         
-        await loadUserCity();
         setupNavigation();
         setupInfiniteScroll();
         
     } catch (error) {
         console.error('Ошибка инициализации приложения:', error);
-        await loadUserCity();
         setupNavigation();
         setupInfiniteScroll();
     }
 }
 
 document.addEventListener('DOMContentLoaded', initApp);
-
-async function loadUserCity() {
-    try {
-        const userId = await getCurrentUser();
-        if (!userId) {
-            console.log('Пользователь не авторизован, загружаем базовые мероприятия');
-            await loadEvents();
-            return;
-        }
-
-        const response = await fetch(`${API_BASE_URL}/profile?id=${userId}`, {
-            method: 'GET',
-            headers: {
-                'Content-Type': 'application/json'
-            }
-        });
-
-        if (response.ok) {
-            const userData = await response.json();
-            userCity = userData.city || '';
-            console.log('Город пользователя:', userCity);
-        }
-    } catch (error) {
-        console.error('Ошибка загрузки города пользователя:', error);
-    } finally {
-        await loadEvents();
-    }
-}
 
 function setupInfiniteScroll() {
     window.addEventListener('scroll', () => {
@@ -216,6 +180,7 @@ function setupInfiniteScroll() {
     });
 }
 
+// Загрузка мероприятий
 async function loadEvents() {
     try {
         const userId = await getCurrentUser();
@@ -252,6 +217,7 @@ async function loadEvents() {
     }
 }
 
+// Загрузка дополнительных мероприятий
 async function loadMoreEvents() {
     if (isLoading || !hasMoreEvents) return;
     
@@ -289,6 +255,7 @@ async function loadMoreEvents() {
                 displayEvents(currentEvents);
                 currentSkip += limit;
                 
+                // Если пришло меньше событий, чем запрошено, значит больше нет
                 if (newEvents.length < limit) {
                     hasMoreEvents = false;
                     hideLoadingIndicator();
@@ -312,6 +279,7 @@ async function loadMoreEvents() {
     }
 }
 
+// Отображение мероприятий
 function displayEvents(events) {
     const eventsList = document.getElementById('eventsList');
     
@@ -320,6 +288,7 @@ function displayEvents(events) {
         return;
     }
     
+    // Удаляем индикаторы загрузки если они есть
     const existingIndicators = eventsList.querySelectorAll('.loading-indicator, .no-more-events');
     existingIndicators.forEach(indicator => indicator.remove());
     
@@ -350,12 +319,14 @@ function displayEvents(events) {
             </div>
         </div>
     `).join('');
-
-    if (hasMoreEvents && userCity) {
+    
+    // Добавляем индикатор загрузки если есть еще события
+    if (hasMoreEvents) {
         eventsList.innerHTML += `<div class="loading-indicator">Загрузка...</div>`;
     }
 }
 
+// Показать индикатор загрузки
 function showLoadingIndicator() {
     const eventsList = document.getElementById('eventsList');
     if (!eventsList) return;
@@ -366,6 +337,7 @@ function showLoadingIndicator() {
     }
 }
 
+// Скрыть индикатор загрузки
 function hideLoadingIndicator() {
     const indicator = document.querySelector('.loading-indicator');
     if (indicator) {
@@ -373,6 +345,7 @@ function hideLoadingIndicator() {
     }
 }
 
+// Показать сообщение о том, что события закончились
 function showNoMoreEvents() {
     const eventsList = document.getElementById('eventsList');
     if (!eventsList) return;
@@ -387,6 +360,7 @@ function showNoMoreEvents() {
     }
 }
 
+// Открытие модального окна с лобби
 async function openFlamesModal(eventId) {
     try {
         selectedEventId = eventId;
@@ -435,6 +409,7 @@ async function openFlamesModal(eventId) {
     }
 }
 
+// Закрытие модального окна лобби
 function closeFlamesModal() {
     const flamesModal = document.getElementById('flamesModal');
     if (flamesModal) {
@@ -444,6 +419,7 @@ function closeFlamesModal() {
     currentFlames = [];
 }
 
+// Отображение лобби
 async function displayFlames(flames) {
     const flamesList = document.getElementById('flamesList');
     if (!flamesList) {
@@ -498,6 +474,7 @@ async function displayFlames(flames) {
     }).join('');
 }
 
+// Лайк пользователя
 async function likeUser(userId, button) {
     try {
         const currentUserId = await getCurrentUser();
@@ -542,6 +519,7 @@ async function likeUser(userId, button) {
     }
 }
 
+// Открытие модального окна создания лобби
 function openCreateFlameModal() {
     const createFlameModal = document.getElementById('createFlameModal');
     const flameDescription = document.getElementById('flameDescription');
@@ -555,6 +533,7 @@ function openCreateFlameModal() {
     }
 }
 
+// Закрытие модального окна создания лобби
 function closeCreateFlameModal() {
     const createFlameModal = document.getElementById('createFlameModal');
     if (createFlameModal) {
@@ -562,6 +541,7 @@ function closeCreateFlameModal() {
     }
 }
 
+// Создание лобби
 async function createFlame() {
     const flameDescription = document.getElementById('flameDescription');
     if (!flameDescription) {
@@ -617,6 +597,7 @@ async function createFlame() {
     }
 }
 
+// Вспомогательные функции
 function formatDate(dateString) {
     try {
         const date = new Date(dateString);
@@ -650,6 +631,7 @@ function showMessage(message, type = 'info') {
     console.log(`${type.toUpperCase()}: ${message}`);
 }
 
+// Настройка навигации
 function setupNavigation() {
     const profileButton = document.querySelector('.nav-button:nth-child(1)');
     const mainButton = document.querySelector('.main-button');
@@ -667,6 +649,7 @@ function setupNavigation() {
     }
 }
 
+// Закрытие модальных окон при клике вне их
 document.addEventListener('click', function(event) {
     const flamesModal = document.getElementById('flamesModal');
     const createFlameModal = document.getElementById('createFlameModal');
