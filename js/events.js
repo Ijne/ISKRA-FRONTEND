@@ -260,42 +260,40 @@ async function loadEvents() {
         console.log('Загрузка мероприятий (GET)...');
         
         // Сначала делаем GET запрос
-        const getResponse = await fetch(url, {
-            method: 'GET',
-            headers: {
-                'Content-Type': 'application/json'
-            }
-        });
+        let getEvents = [];
+        try {
+            const getResponse = await fetch(url, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
 
-        if (getResponse.ok) {
-            const data = await getResponse.json();
-            
-            if (data.status === 'ok') {
-                currentEvents = data.events || [];
-                console.log(`GET: Загружено мероприятий: ${currentEvents.length}`);
+            if (getResponse.ok) {
+                const data = await getResponse.json();
                 
-                // Если GET вернул мероприятия, показываем их
-                if (currentEvents.length > 0) {
-                    displayEvents(currentEvents);
-                    initialLoadCompleted = true;
-                    return;
+                if (data.status === 'ok') {
+                    getEvents = data.events || [];
+                    console.log(`GET: Загружено мероприятий: ${getEvents.length}`);
                 }
             }
+        } catch (getError) {
+            console.error('Ошибка GET запроса:', getError);
         }
 
-        // Если GET не вернул мероприятия или вернул пустой список, делаем POST запрос
-        console.log('GET не вернул мероприятия, выполняем POST запрос...');
-        await loadMoreEvents(true);
+        // Всегда выполняем POST запрос после GET
+        console.log('Выполняем POST запрос после GET...');
+        await loadMoreEvents(true, getEvents);
         
     } catch (error) {
-        console.error('Ошибка загрузки мероприятий (GET):', error);
-        // При ошибке GET тоже пробуем POST
-        await loadMoreEvents(true);
+        console.error('Ошибка загрузки мероприятий:', error);
+        // При ошибке тоже пробуем POST
+        await loadMoreEvents(true, []);
     }
 }
 
 // Загрузка дополнительных мероприятий (POST)
-async function loadMoreEvents(isInitialLoad = false) {
+async function loadMoreEvents(isInitialLoad = false, existingEvents = []) {
     if (isLoading && !isInitialLoad) return;
     
     isLoading = true;
@@ -316,7 +314,8 @@ async function loadMoreEvents(isInitialLoad = false) {
             },
             body: JSON.stringify({
                 limit: limit,
-                skip: currentSkip
+                skip: currentSkip,
+                city: userCity || '' // Добавляем город в запрос, если есть
             })
         });
 
@@ -330,23 +329,25 @@ async function loadMoreEvents(isInitialLoad = false) {
             const newEvents = data.events || [];
             console.log(`POST: Загружено мероприятий: ${newEvents.length}`);
             
-            if (newEvents.length > 0) {
-                // Объединяем с существующими мероприятиями, избегая дубликатов
-                const existingIds = new Set(currentEvents.map(event => event.ID));
-                const uniqueNewEvents = newEvents.filter(event => !existingIds.has(event.ID));
-                
-                currentEvents = [...currentEvents, ...uniqueNewEvents];
+            // Объединяем события из GET и POST, избегая дубликатов
+            const allEvents = [...existingEvents];
+            const existingIds = new Set(existingEvents.map(event => event.ID));
+            
+            newEvents.forEach(event => {
+                if (!existingIds.has(event.ID)) {
+                    allEvents.push(event);
+                }
+            });
+            
+            currentEvents = allEvents;
+            
+            if (currentEvents.length > 0) {
                 displayEvents(currentEvents);
                 currentSkip += limit;
-                hasMoreEvents = true;
+                hasMoreEvents = newEvents.length === limit; // Если пришло меньше чем limit, значит больше нет
             } else {
                 hasMoreEvents = false;
-                // Если это первоначальная загрузка и мероприятий нет, показываем соответствующее сообщение
-                if (isInitialLoad && currentEvents.length === 0) {
-                    displayNoEventsMessage();
-                } else {
-                    showNoMoreEvents();
-                }
+                displayNoEventsMessage();
             }
             
             initialLoadCompleted = true;
@@ -456,12 +457,7 @@ function showNoMoreEvents() {
     }
 }
 
-// Остальные функции остаются без изменений...
-// [Здесь должны быть функции openFlamesModal, closeFlamesModal, displayFlames, likeUser, 
-// openCreateFlameModal, closeCreateFlameModal, createFlame, formatDate, escapeHtml, 
-// getInitials, showMessage, setupNavigation и обработчики кликов]
-
-// Открытие модального окна с лобби
+// Остальные функции без изменений...
 async function openFlamesModal(eventId) {
     try {
         selectedEventId = eventId;
@@ -510,7 +506,6 @@ async function openFlamesModal(eventId) {
     }
 }
 
-// Закрытие модального окна лобби
 function closeFlamesModal() {
     const flamesModal = document.getElementById('flamesModal');
     if (flamesModal) {
@@ -520,7 +515,6 @@ function closeFlamesModal() {
     currentFlames = [];
 }
 
-// Отображение лобби
 async function displayFlames(flames) {
     const flamesList = document.getElementById('flamesList');
     if (!flamesList) {
@@ -575,7 +569,6 @@ async function displayFlames(flames) {
     }).join('');
 }
 
-// Лайк пользователя
 async function likeUser(userId, button) {
     try {
         const currentUserId = await getCurrentUser();
@@ -620,7 +613,6 @@ async function likeUser(userId, button) {
     }
 }
 
-// Открытие модального окна создания лобби
 function openCreateFlameModal() {
     const createFlameModal = document.getElementById('createFlameModal');
     const flameDescription = document.getElementById('flameDescription');
@@ -634,7 +626,6 @@ function openCreateFlameModal() {
     }
 }
 
-// Закрытие модального окна создания лобби
 function closeCreateFlameModal() {
     const createFlameModal = document.getElementById('createFlameModal');
     if (createFlameModal) {
@@ -642,7 +633,6 @@ function closeCreateFlameModal() {
     }
 }
 
-// Создание лобби
 async function createFlame() {
     const flameDescription = document.getElementById('flameDescription');
     if (!flameDescription) {
