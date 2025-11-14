@@ -1,3 +1,5 @@
+let initData = null;
+let WebApp = null;
 const API_BASE_URL = 'http://localhost:8080';
 
 let currentEvents = [];
@@ -8,8 +10,7 @@ let currentSkip = 0;
 const limit = 5;
 let isLoading = false;
 let hasMoreEvents = true;
-let initData = null;
-let WebApp = null;
+let initialLoadCompleted = false;
 
 // Универсальная функция ожидания загрузки WebApp
 function waitForWebApp() {
@@ -121,7 +122,7 @@ async function getCurrentUser() {
     }
 }
 
-// Функция валидации init data (опционально, можно отключить если не работает)
+// Функция валидации init data
 async function validateInitData(decodedString, receivedHash) {
     try {
         const params = new URLSearchParams(decodedString);
@@ -187,27 +188,60 @@ async function validateInitData(decodedString, receivedHash) {
     }
 }
 
+// Загрузка мероприятий при загрузке страницы
 async function initApp() {
     try {
         await waitForWebApp();
         console.log('Приложение инициализировано');
         
+        await loadUserCity();
         setupNavigation();
         setupInfiniteScroll();
         
+        // Сразу запускаем загрузку мероприятий
         await loadEvents();
+        
     } catch (error) {
         console.error('Ошибка инициализации приложения:', error);
+        await loadUserCity();
         setupNavigation();
         setupInfiniteScroll();
+        await loadEvents();
     }
 }
 
 document.addEventListener('DOMContentLoaded', initApp);
 
+// Загрузка города пользователя
+async function loadUserCity() {
+    try {
+        const userId = await getCurrentUser();
+        if (!userId) {
+            console.log('Пользователь не авторизован');
+            return;
+        }
+
+        const response = await fetch(`${API_BASE_URL}/profile?id=${userId}`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (response.ok) {
+            const userData = await response.json();
+            userCity = userData.city || '';
+            console.log('Город пользователя:', userCity);
+        }
+    } catch (error) {
+        console.error('Ошибка загрузки города пользователя:', error);
+    }
+}
+
+// Настройка бесконечной прокрутки
 function setupInfiniteScroll() {
     window.addEventListener('scroll', () => {
-        if (isLoading || !hasMoreEvents) return;
+        if (isLoading || !hasMoreEvents || !initialLoadCompleted) return;
 
         const { scrollTop, scrollHeight, clientHeight } = document.documentElement;
         
@@ -217,64 +251,74 @@ function setupInfiniteScroll() {
     });
 }
 
-// Загрузка мероприятий
+// Основная загрузка мероприятий (GET + POST)
 async function loadEvents() {
     try {
         const userId = await getCurrentUser();
-        console.log(`GET events userId: ${userId}`)
         const url = userId ? `${API_BASE_URL}/events?id=${userId}` : `${API_BASE_URL}/events`;
         
-        console.log('Загрузка мероприятий...');
-        const response = await fetch(url, {
+        console.log('Загрузка мероприятий (GET)...');
+        
+        // Сначала делаем GET запрос
+        const getResponse = await fetch(url, {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json'
             }
         });
 
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+        if (getResponse.ok) {
+            const data = await getResponse.json();
+            
+            if (data.status === 'ok') {
+                currentEvents = data.events || [];
+                console.log(`GET: Загружено мероприятий: ${currentEvents.length}`);
+                
+                // Если GET вернул мероприятия, показываем их
+                if (currentEvents.length > 0) {
+                    displayEvents(currentEvents);
+                    initialLoadCompleted = true;
+                    return;
+                }
+            }
         }
 
-        const data = await response.json();
+        // Если GET не вернул мероприятия или вернул пустой список, делаем POST запрос
+        console.log('GET не вернул мероприятия, выполняем POST запрос...');
+        await loadMoreEvents(true);
         
-        if (data.status === 'ok') {
-            currentEvents = data.events || [];
-            console.log(`Загружено мероприятий: ${currentEvents.length}`);
-            displayEvents(currentEvents);
-            
-            await loadMoreEvents();
-            
-        } else {
-            throw new Error(data.error || 'Неизвестная ошибка');
-        }
     } catch (error) {
-        console.error('Ошибка загрузки мероприятий:', error);
-        showMessage('Не удалось загрузить мероприятия', 'error');
-        await loadMoreEvents();
+        console.error('Ошибка загрузки мероприятий (GET):', error);
+        // При ошибке GET тоже пробуем POST
+        await loadMoreEvents(true);
     }
 }
 
-async function loadEvents() {
+// Загрузка дополнительных мероприятий (POST)
+async function loadMoreEvents(isInitialLoad = false) {
+    if (isLoading && !isInitialLoad) return;
+    
+    isLoading = true;
+    
+    if (isInitialLoad) {
+        showLoadingIndicator();
+    }
+
     try {
         const userId = await getCurrentUser();
         const url = userId ? `${API_BASE_URL}/events?id=${userId}` : `${API_BASE_URL}/events`;
         
-        console.log('Загрузка мероприятий... URL:', url);
-        
-        // Добавляем timeout для запроса
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 секунд timeout
-        
+        console.log(`Загрузка мероприятий (POST) - skip: ${currentSkip}, limit: ${limit}`);
         const response = await fetch(url, {
-            method: 'GET',
+            method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            signal: controller.signal
+            body: JSON.stringify({
+                limit: limit,
+                skip: currentSkip
+            })
         });
-        
-        clearTimeout(timeoutId);
 
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
@@ -283,26 +327,41 @@ async function loadEvents() {
         const data = await response.json();
         
         if (data.status === 'ok') {
-            currentEvents = data.events || [];
-            console.log(`Загружено мероприятий: ${currentEvents.length}`);
-            displayEvents(currentEvents);
+            const newEvents = data.events || [];
+            console.log(`POST: Загружено мероприятий: ${newEvents.length}`);
             
-            await loadMoreEvents();
+            if (newEvents.length > 0) {
+                // Объединяем с существующими мероприятиями, избегая дубликатов
+                const existingIds = new Set(currentEvents.map(event => event.ID));
+                const uniqueNewEvents = newEvents.filter(event => !existingIds.has(event.ID));
+                
+                currentEvents = [...currentEvents, ...uniqueNewEvents];
+                displayEvents(currentEvents);
+                currentSkip += limit;
+                hasMoreEvents = true;
+            } else {
+                hasMoreEvents = false;
+                // Если это первоначальная загрузка и мероприятий нет, показываем соответствующее сообщение
+                if (isInitialLoad && currentEvents.length === 0) {
+                    displayNoEventsMessage();
+                } else {
+                    showNoMoreEvents();
+                }
+            }
+            
+            initialLoadCompleted = true;
         } else {
             throw new Error(data.error || 'Неизвестная ошибка');
         }
     } catch (error) {
-        console.error('Ошибка загрузки мероприятий:', error);
-        // Показываем сообщение об ошибке вместо бесконечной загрузки
-        const eventsList = document.getElementById('eventsList');
-        if (eventsList) {
-            eventsList.innerHTML = `
-                <div class="error-message">
-                    Не удалось загрузить мероприятия. Проверьте подключение к серверу.
-                </div>
-            `;
+        console.error('Ошибка загрузки мероприятий (POST):', error);
+        // Если это первоначальная загрузка и произошла ошибка, показываем сообщение
+        if (isInitialLoad && currentEvents.length === 0) {
+            displayNoEventsMessage();
         }
-        showMessage('Не удалось загрузить мероприятия', 'error');
+    } finally {
+        isLoading = false;
+        hideLoadingIndicator();
     }
 }
 
@@ -316,15 +375,11 @@ function displayEvents(events) {
     }
     
     // Удаляем индикаторы загрузки если они есть
-    const existingIndicators = eventsList.querySelectorAll('.loading-indicator, .no-more-events');
+    const existingIndicators = eventsList.querySelectorAll('.loading-indicator, .no-more-events, .no-events-message');
     existingIndicators.forEach(indicator => indicator.remove());
     
     if (!events || events.length === 0) {
-        eventsList.innerHTML = `
-            <div class="no-events">
-                Пока нет доступных мероприятий
-            </div>
-        `;
+        displayNoEventsMessage();
         return;
     }
 
@@ -353,6 +408,20 @@ function displayEvents(events) {
     }
 }
 
+// Показать сообщение когда мероприятий нет
+function displayNoEventsMessage() {
+    const eventsList = document.getElementById('eventsList');
+    if (!eventsList) return;
+    
+    eventsList.innerHTML = `
+        <div class="no-events-message">
+            <div class="no-events-icon">🎭</div>
+            <div class="no-events-text">Пока нет доступных мероприятий</div>
+            <div class="no-events-hint">Попробуйте позже или измените настройки поиска</div>
+        </div>
+    `;
+}
+
 // Показать индикатор загрузки
 function showLoadingIndicator() {
     const eventsList = document.getElementById('eventsList');
@@ -360,7 +429,7 @@ function showLoadingIndicator() {
     
     const existingIndicator = eventsList.querySelector('.loading-indicator');
     if (!existingIndicator) {
-        eventsList.innerHTML += `<div class="loading-indicator">Загрузка...</div>`;
+        eventsList.innerHTML = `<div class="loading-indicator">Загрузка мероприятий...</div>`;
     }
 }
 
@@ -378,7 +447,7 @@ function showNoMoreEvents() {
     if (!eventsList) return;
     
     const existingMessage = eventsList.querySelector('.no-more-events');
-    if (!existingMessage) {
+    if (!existingMessage && currentEvents.length > 0) {
         eventsList.innerHTML += `
             <div class="no-more-events">
                 Все мероприятия загружены
@@ -386,6 +455,11 @@ function showNoMoreEvents() {
         `;
     }
 }
+
+// Остальные функции остаются без изменений...
+// [Здесь должны быть функции openFlamesModal, closeFlamesModal, displayFlames, likeUser, 
+// openCreateFlameModal, closeCreateFlameModal, createFlame, formatDate, escapeHtml, 
+// getInitials, showMessage, setupNavigation и обработчики кликов]
 
 // Открытие модального окна с лобби
 async function openFlamesModal(eventId) {
