@@ -11,11 +11,13 @@ let hasMoreEvents = true;
 let initData = null;
 let WebApp = null;
 
+// Универсальная функция ожидания загрузки WebApp
 function waitForWebApp() {
-    return new Promise((resolve, reject) => {
-        if (window.WebApp) {
+    return new Promise((resolve) => {
+        if (window.WebApp?.initData) {
             WebApp = window.WebApp;
             initData = window.WebApp?.initData;
+            console.log('WebApp загружен:', WebApp);
             resolve();
             return;
         }
@@ -43,111 +45,145 @@ function waitForWebApp() {
     });
 }
 
+// Универсальная функция получения ID пользователя
 async function getCurrentUser() {
     try {
         await waitForWebApp();
         
         if (!initData) {
             console.error('No init data found');
-            return 0;
+            return null;
         }
 
-        let decodedString;
+        console.log('InitData type:', typeof initData, initData);
         
+        // Если initData уже объект (новый формат Telegram Web App)
         if (typeof initData === 'object') {
             const user = initData.user || initData;
-            return user.id || 0;
+            const userId = user.id || null;
+            console.log('User ID from object:', userId);
+            return userId;
         }
-        
+
+        // Если initData строка (старый формат)
         if (typeof initData === 'string') {
-            decodedString = decodeURIComponent(initData);
-
+            const decodedString = decodeURIComponent(initData);
             const params = new URLSearchParams(decodedString);
-            const receivedHash = params.get('hash');
             
-            if (!receivedHash) {
-                console.error('Hash not found in init data');
-                const userParam = params.get('user');
-                if (userParam) {
-                    try {
-                        const userData = JSON.parse(userParam);
-                        return userData.id || 0;
-                    } catch (e) {
-                        console.error('Error parsing user data:', e);
-                    }
-                }
-                return 0;
-            }
-
+            console.log('Parsed params:', Object.fromEntries(params));
+            
+            // Пробуем получить user параметр напрямую
             const userParam = params.get('user');
-            
-            const dataPairs = [];
-            for (const [key, value] of params) {
-                if (key !== 'hash') {
-                    dataPairs.push(`${key}=${value}`);
+            if (userParam) {
+                try {
+                    const userData = JSON.parse(userParam);
+                    const userId = userData.id || null;
+                    console.log('User ID from user param:', userId);
+                    if (userId) return userId;
+                } catch (e) {
+                    console.error('Error parsing user data:', e);
                 }
             }
-            dataPairs.sort();
             
-            const dataCheckString = dataPairs.join('\n');
-
-            const botToken = 'f9LHodD0cOLRQi29OdyXpiSqLM-SyPUJnePMbZQH3ceilC7cKmf12ib4C7Oeda975ZN_gzuX6fJmQVKE5j1e';
+            // Если не нашли в user параметре, пробуем другие варианты
+            const userIdParam = params.get('id') || params.get('user_id') || params.get('userId');
+            if (userIdParam) {
+                console.log('User ID from direct param:', userIdParam);
+                return parseInt(userIdParam) || userIdParam;
+            }
             
-            const encoder = new TextEncoder();
-
-            const secretKey = await crypto.subtle.importKey(
-                'raw',
-                encoder.encode('WebAppData'),
-                { name: 'HMAC', hash: 'SHA-256' },
-                false,
-                ['sign']
-            );
-
-            const cryptoKey = await crypto.subtle.sign(
-                'HMAC',
-                secretKey,
-                encoder.encode(botToken)
-            );
-
-            const hmacKey = await crypto.subtle.importKey(
-                'raw',
-                cryptoKey,
-                { name: 'HMAC', hash: 'SHA-256' },
-                false,
-                ['sign']
-            );
-
-            const signature = await crypto.subtle.sign(
-                'HMAC',
-                hmacKey,
-                encoder.encode(dataCheckString)
-            );
-            
-            const calculatedHash = Array.from(new Uint8Array(signature))
-                .map(b => b.toString(16).padStart(2, '0'))
-                .join('');
-            
-
-            if (calculatedHash === receivedHash) {
-                
-                if (userParam) {
+            // Если есть hash, пробуем валидацию
+            const receivedHash = params.get('hash');
+            if (receivedHash) {
+                console.log('Attempting hash validation...');
+                const isValid = await validateInitData(decodedString, receivedHash);
+                if (isValid && userParam) {
                     try {
                         const userData = JSON.parse(userParam);
-                        return userData.id || 0;
+                        const userId = userData.id || null;
+                        console.log('User ID after hash validation:', userId);
+                        return userId;
                     } catch (parseError) {
-                        console.error('Error parsing user data:', parseError);
-                        return 0;
+                        console.error('Error parsing user data after validation:', parseError);
                     }
                 }
-            } else {
-                return 0;
             }
+            
+            // Если ничего не помогло, возвращаем null
+            console.log('No user ID found in init data');
+            return null;
         }
         
         return null;
     } catch (error) {
-        console.error('Validation error:', error);
+        console.error('Error in getCurrentUser:', error);
         return null;
+    }
+}
+
+// Функция валидации init data (опционально, можно отключить если не работает)
+async function validateInitData(decodedString, receivedHash) {
+    try {
+        const params = new URLSearchParams(decodedString);
+        const userParam = params.get('user');
+        
+        const dataPairs = [];
+        for (const [key, value] of params) {
+            if (key !== 'hash') {
+                dataPairs.push(`${key}=${value}`);
+            }
+        }
+        dataPairs.sort();
+        
+        const dataCheckString = dataPairs.join('\n');
+        console.log('Data check string:', dataCheckString);
+
+        const botToken = 'f9LHodD0cOLRQi29OdyXpiSqLM-SyPUJnePMbZQH3ceilC7cKmf12ib4C7Oeda975ZN_gzuX6fJmQVKE5j1e';
+        
+        const encoder = new TextEncoder();
+
+        const secretKey = await crypto.subtle.importKey(
+            'raw',
+            encoder.encode('WebAppData'),
+            { name: 'HMAC', hash: 'SHA-256' },
+            false,
+            ['sign']
+        );
+
+        const cryptoKey = await crypto.subtle.sign(
+            'HMAC',
+            secretKey,
+            encoder.encode(botToken)
+        );
+
+        const hmacKey = await crypto.subtle.importKey(
+            'raw',
+            cryptoKey,
+            { name: 'HMAC', hash: 'SHA-256' },
+            false,
+            ['sign']
+        );
+
+        const signature = await crypto.subtle.sign(
+            'HMAC',
+            hmacKey,
+            encoder.encode(dataCheckString)
+        );
+        
+        const calculatedHash = Array.from(new Uint8Array(signature))
+            .map(b => b.toString(16).padStart(2, '0'))
+            .join('');
+        
+        console.log('Hash validation - calculated:', calculatedHash);
+        console.log('Hash validation - received:', receivedHash);
+
+        const isValid = calculatedHash === receivedHash;
+        console.log('Hash validation result:', isValid);
+        
+        return isValid;
+    } catch (error) {
+        console.error('Error in hash validation:', error);
+        return false;
     }
 }
 
@@ -218,29 +254,26 @@ async function loadEvents() {
     }
 }
 
-// Загрузка дополнительных мероприятий
-async function loadMoreEvents() {
-    if (isLoading || !hasMoreEvents) return;
-    
-    isLoading = true;
-    showLoadingIndicator();
-
+async function loadEvents() {
     try {
         const userId = await getCurrentUser();
-        console.log(`POST events userId: ${userId}`)
         const url = userId ? `${API_BASE_URL}/events?id=${userId}` : `${API_BASE_URL}/events`;
         
-        console.log(`Загрузка дополнительных мероприятий (skip: ${currentSkip}, limit: ${limit})`);
+        console.log('Загрузка мероприятий... URL:', url);
+        
+        // Добавляем timeout для запроса
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 секунд timeout
+        
         const response = await fetch(url, {
-            method: 'POST',
+            method: 'GET',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({
-                limit: limit,
-                skip: currentSkip
-            })
+            signal: controller.signal
         });
+        
+        clearTimeout(timeoutId);
 
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
@@ -249,35 +282,26 @@ async function loadMoreEvents() {
         const data = await response.json();
         
         if (data.status === 'ok') {
-            const newEvents = data.events || [];
-            console.log(`Загружено дополнительных мероприятий: ${newEvents.length}`);
+            currentEvents = data.events || [];
+            console.log(`Загружено мероприятий: ${currentEvents.length}`);
+            displayEvents(currentEvents);
             
-            if (newEvents.length > 0) {
-                currentEvents = [...currentEvents, ...newEvents];
-                displayEvents(currentEvents);
-                currentSkip += limit;
-                
-                // Если пришло меньше событий, чем запрошено, значит больше нет
-                if (newEvents.length < limit) {
-                    hasMoreEvents = false;
-                    hideLoadingIndicator();
-                    showNoMoreEvents();
-                    console.log('Больше мероприятий нет');
-                }
-            } else {
-                hasMoreEvents = false;
-                showNoMoreEvents();
-                console.log('Больше мероприятий нет');
-            }
+            await loadMoreEvents();
         } else {
             throw new Error(data.error || 'Неизвестная ошибка');
         }
     } catch (error) {
-        console.error('Ошибка загрузки дополнительных мероприятий:', error);
-        showMessage('Не удалось загрузить дополнительные мероприятия', 'error');
-    } finally {
-        isLoading = false;
-        hideLoadingIndicator();
+        console.error('Ошибка загрузки мероприятий:', error);
+        // Показываем сообщение об ошибке вместо бесконечной загрузки
+        const eventsList = document.getElementById('eventsList');
+        if (eventsList) {
+            eventsList.innerHTML = `
+                <div class="error-message">
+                    Не удалось загрузить мероприятия. Проверьте подключение к серверу.
+                </div>
+            `;
+        }
+        showMessage('Не удалось загрузить мероприятия', 'error');
     }
 }
 
