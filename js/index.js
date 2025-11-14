@@ -1,5 +1,31 @@
+const DEFAULT_PHOTO = './images/example.jpg';
+
 let initData = null;
 let WebApp = null;
+let currentOnboardingScreen = 1;
+const selectedOnboardingItems = {
+    career: [],
+    personality: [],
+    relationship: [],
+    values: [],
+    music: [],
+    movies: [],
+    hobbies: [],
+    events: []
+};
+let userBasicInfo = {
+    age: '',
+    city: '',
+    gender: '',
+    preferredGender: '',
+    vkProfile: ''
+};
+let userPhoto = null;
+let recommendedUsers = [];
+let currentUserIndex = 0;
+let startX = 0;
+let currentX = 0;
+let isDragging = false;
 
 function waitForWebApp() {
     return new Promise((resolve, reject) => {
@@ -63,7 +89,7 @@ function parseInitData(initData) {
 
     if (userData) {
         console.log(
-           userData.id, userData.username, userData.first_name, userData.last_name, userData.language_code, userData
+            userData.id, userData.username, userData.first_name, userData.last_name, userData.language_code, userData
         )
         return {
             id: userData.id || null,
@@ -103,31 +129,6 @@ async function getCurrentUser() {
         return { id: 0 };
     }
 }
-
-let currentOnboardingScreen = 1;
-const selectedOnboardingItems = {
-    career: [],
-    personality: [],
-    relationship: [],
-    values: [],
-    music: [],
-    movies: [],
-    hobbies: [],
-    events: []
-};
-let userBasicInfo = {
-    age: '',
-    city: '',
-    gender: '',
-    preferredGender: '',
-    vkProfile: ''
-};
-
-let recommendedUsers = [];
-let currentUserIndex = 0;
-let startX = 0;
-let currentX = 0;
-let isDragging = false;
 
 async function checkUserAuthorization() {
     const userData = await getCurrentUser();
@@ -182,6 +183,7 @@ function loadOnboarding() {
         selectedOnboardingItems[key] = [];
     });
     userBasicInfo = { age: '', city: '', gender: '', preferredGender: '', vkProfile: '' };
+    userPhoto = null;
     
     const mainContent = document.getElementById('mainContent');
     const body = document.body;
@@ -223,6 +225,7 @@ function loadOnboarding() {
                     </div>
                 </div>
             </div>
+
             <div class="onboarding-progress">
                 <div class="onboarding-progress-fill" id="onboardingProgressFill"></div>
             </div>
@@ -278,6 +281,22 @@ function loadOnboarding() {
                                 placeholder="https://vk.com/username"
                                 oninput="updateBasicInfo('vkProfile', this.value)">
                             <span class="onboarding-input-edit">✎</span>
+                        </div>
+                    </div>
+
+                    <div class="photo-upload-section">
+                        <div class="photo-upload-container">
+                            <div class="photo-preview" id="photoPreview">
+                                <div class="photo-placeholder">
+                                    <div class="camera-icon">📷</div>
+                                    <div class="photo-text">Добавить фото</div>
+                                </div>
+                            </div>
+                            <input type="file" id="photoInput" accept="image/*" style="display: none;">
+                            <button class="photo-upload-btn" onclick="document.getElementById('photoInput').click()">
+                                Выбрать фото
+                            </button>
+                            <div class="photo-optional">Необязательно</div>
                         </div>
                     </div>
                     
@@ -433,12 +452,58 @@ function loadOnboarding() {
     
     initOnboarding();
     initSparkAnimation();
+    initPhotoUpload();
+}
+
+function initPhotoUpload() {
+    const photoInput = document.getElementById('photoInput');
+    const photoPreview = document.getElementById('photoPreview');
+    
+    if (!photoInput || !photoPreview) return;
+    
+    photoInput.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            if (!file.type.startsWith('image/')) {
+                alert('Выберите файл изображения');
+                return;
+            }
+            
+            if (file.size > 5 * 1024 * 1024) {
+                alert('Фото должно быть меньше 5MB');
+                return;
+            }
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    if (img.height <= img.width) {
+                        alert('Выберите вертикальное фото');
+                        return;
+                    }
+
+                    userPhoto = e.target.result;
+
+                    photoPreview.innerHTML = `
+                        <img src="${userPhoto}" alt="Фото" style="width: 100%; height: 100%; object-fit: cover; border-radius: 18px;">
+                    `;
+                    photoPreview.classList.add('has-photo');
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+
+    photoPreview.addEventListener('click', function() {
+        photoInput.click();
+    });
 }
 
 function initSparkAnimation() {
     const sparkContainer = document.getElementById('sparkContainer');
     const authContainer = document.getElementById('authContainer');
-    const mainContainer = document.getElementById('mainContainer');
     const fireCanvas = document.getElementById('fireCanvas');
     const loadingContainer = document.getElementById('loadingContainer');
     const loadingProgress = document.getElementById('loadingProgress');
@@ -672,10 +737,10 @@ async function loadMainContent() {
                 
                 <div class="user-card" id="userCard">
                     <div class="card-background"></div>
-                    <div class="swipe-overlay swipe-like"></div>
-                    <div class="swipe-overlay swipe-dislike"></div>
+                    <div class="swipe-overlay swipe-like">👍</div>
+                    <div class="swipe-overlay swipe-dislike">👎</div>
                     <div class="card-content">
-                        <div class="card-main-info">
+                        <div class="card-main-info" id="cardMainInfo">
                             <h2 class="user-name" id="userName">Имя</h2>
                             <div class="user-age-city" id="userAgeCity">Возраст • Город</div>
                             <div class="user-events-tags" id="userEventsTags"></div>
@@ -747,6 +812,13 @@ function loadNextUser() {
     userCard.style.transform = 'translateY(20px)';
     
     setTimeout(() => {
+        const cardBackground = userCard.querySelector('.card-background');
+        if (user.photo) {
+            cardBackground.style.backgroundImage = `url(${user.photo})`;
+        } else {
+            cardBackground.style.backgroundImage = `url(${DEFAULT_PHOTO})`;
+        }
+        
         document.getElementById('userName').textContent = user.name || 'Не указано';
         document.getElementById('userAgeCity').textContent = `${user.age || '?'} • ${user.city || 'Не указан'}`;
         
@@ -838,6 +910,7 @@ async function sendInteraction(targetUserId, isLike) {
 
 function initSwipeHandlers() {
     const card = document.getElementById('userCard');
+    if (!card) return;
     
     card.addEventListener('touchstart', handleTouchStart, { passive: false });
     card.addEventListener('touchmove', handleTouchMove, { passive: false });
@@ -918,6 +991,8 @@ function updateSwipeOverlay() {
     const likeOverlay = document.querySelector('.swipe-like');
     const dislikeOverlay = document.querySelector('.swipe-dislike');
     
+    if (!likeOverlay || !dislikeOverlay) return;
+    
     likeOverlay.style.opacity = '0';
     dislikeOverlay.style.opacity = '0';
     
@@ -931,6 +1006,8 @@ function updateSwipeOverlay() {
 function resetSwipeOverlay() {
     const likeOverlay = document.querySelector('.swipe-like');
     const dislikeOverlay = document.querySelector('.swipe-dislike');
+    
+    if (!likeOverlay || !dislikeOverlay) return;
     
     likeOverlay.style.opacity = '0';
     dislikeOverlay.style.opacity = '0';
@@ -1026,10 +1103,10 @@ function updateBasicInfo(field, value) {
 
 function checkScreen2Complete() {
     const isComplete = userBasicInfo.age && 
-                      userBasicInfo.city && 
-                      userBasicInfo.gender && 
-                      userBasicInfo.preferredGender &&
-                      userBasicInfo.vkProfile;
+                        userBasicInfo.city && 
+                        userBasicInfo.gender && 
+                        userBasicInfo.preferredGender &&
+                        userBasicInfo.vkProfile;
     
     const button = document.getElementById('screen2Button');
     const message = document.getElementById('screen2Message');
@@ -1043,7 +1120,14 @@ function checkScreen2Complete() {
         } else {
             button.classList.remove('active');
             if (message) {
-                message.textContent = 'Заполните все обязательные поля';
+                const missingFields = [];
+                if (!userBasicInfo.age) missingFields.push('возраст');
+                if (!userBasicInfo.city) missingFields.push('город');
+                if (!userBasicInfo.gender) missingFields.push('пол');
+                if (!userBasicInfo.preferredGender) missingFields.push('предпочтительный пол');
+                if (!userBasicInfo.vkProfile) missingFields.push('профиль ВК');
+                
+                message.textContent = `Заполните: ${missingFields.join(', ')}`;
                 message.style.display = 'block';
             }
         }
@@ -1260,15 +1344,17 @@ async function completeOnboarding() {
         return;
     }
     
-    if (!userBasicInfo.age || !userBasicInfo.city || !userBasicInfo.gender || !userBasicInfo.preferredGender) {
-        console.log('Не заполнены основные поля:', userBasicInfo);
-        alert('Пожалуйста, заполните все обязательные поля в основной информации');
+    if (!userBasicInfo.age || !userBasicInfo.city || !userBasicInfo.gender || 
+        !userBasicInfo.preferredGender || !userBasicInfo.vkProfile) {
+        console.log('Не заполнены обязательные поля:', { ...userBasicInfo, hasPhoto: !!userPhoto });
+        alert('Пожалуйста, заполните все обязательные поля');
         return;
     }
     
     console.log('Собранные данные:', {
         basic: userBasicInfo,
-        selections: selectedOnboardingItems
+        selections: selectedOnboardingItems,
+        hasPhoto: !!userPhoto
     });
     
     try {
@@ -1295,9 +1381,14 @@ async function completeOnboarding() {
             films: selectedOnboardingItems.movies.join(', ') || '',
             hobbies: selectedOnboardingItems.hobbies.join(', ') || '',
             event_preferences: selectedOnboardingItems.events.join(', ') || '',
+            photo: userPhoto || DEFAULT_PHOTO
         };
 
-        console.log('Отправка данных на сервер:', profileData);
+        console.log('Отправка данных на сервер:', { 
+            ...profileData, 
+            hasPhoto: !!userPhoto 
+        });
+        console.log(profileData.photo)
         
         const button = document.getElementById('screen10Button');
         const originalText = button.textContent;
@@ -1329,6 +1420,7 @@ async function completeOnboarding() {
         console.error('Ошибка при сохранении профиля:', error);
         const button = document.getElementById('screen10Button');
         button.textContent = 'Завершить профиль';
+        button.disabled = false;
     }
 }
 
@@ -1341,14 +1433,10 @@ async function initApp() {
     console.log('Инициализация приложения...');
     
     try {
-        const bottomNav = document.getElementById('bottomNav');
-        bottomNav.style.display = 'none';
         const authStatus = await checkUserAuthorization();
         console.log('Статус авторизации:', authStatus);
         
         if (authStatus.authorized) {
-            const bottomNav = document.getElementById('bottomNav');
-            bottomNav.style.display = 'flex';
             await waitForWebApp();
             await loadMainContent();
         } else {
