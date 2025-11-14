@@ -159,6 +159,7 @@ async function initApp() {
         setupNavigation();
         setupInfiniteScroll();
         
+        await loadEvents();
     } catch (error) {
         console.error('Ошибка инициализации приложения:', error);
         setupNavigation();
