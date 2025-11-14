@@ -184,6 +184,7 @@ function setupInfiniteScroll() {
 async function loadEvents() {
     try {
         const userId = await getCurrentUser();
+        console.log(`GET events userId: ${userId}`)
         const url = userId ? `${API_BASE_URL}/events?id=${userId}` : `${API_BASE_URL}/events`;
         
         console.log('Загрузка мероприятий...');
@@ -226,6 +227,7 @@ async function loadMoreEvents() {
 
     try {
         const userId = await getCurrentUser();
+        console.log(`POST events userId: ${userId}`)
         const url = userId ? `${API_BASE_URL}/events?id=${userId}` : `${API_BASE_URL}/events`;
         
         console.log(`Загрузка дополнительных мероприятий (skip: ${currentSkip}, limit: ${limit})`);
